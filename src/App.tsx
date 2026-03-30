@@ -775,25 +775,6 @@ function App() {
   }
 
   const canLoad = Boolean(files.atlas && files.skeleton && files.images.length > 0) && !loading
-  const atlasPageScaled =
-    atlasInfo && spineSize
-      ? {
-          height:
-            atlasInfo.pageHeight *
-            getDisplayedScale(
-              spineSize.realWidth,
-              spineSize.realHeight,
-              userScale,
-            ),
-          width:
-            atlasInfo.pageWidth *
-            getDisplayedScale(
-              spineSize.realWidth,
-              spineSize.realHeight,
-              userScale,
-            ),
-        }
-      : null
   const minSkeletonScaled =
     animationSizeRange && spineSize
       ? {
@@ -1052,11 +1033,6 @@ function App() {
                     ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
                     : 'Unavailable'}
                 </strong>
-                <span className="viewer-stat-note">
-                  {atlasPageScaled
-                    ? `Scaled ${Math.round(atlasPageScaled.width)} x ${Math.round(atlasPageScaled.height)} px`
-                    : 'Scaled unavailable'}
-                </span>
               </div>
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Atlas Scale</span>

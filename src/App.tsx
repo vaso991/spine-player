@@ -38,13 +38,6 @@ type SpineSize = {
   realtimeHeight: number
 }
 
-type AnimationSizeRange = {
-  minWidth: number
-  minHeight: number
-  maxWidth: number
-  maxHeight: number
-}
-
 type AtlasInfo = {
   pageHeight: number
   pageCount: number
@@ -64,6 +57,8 @@ type PlaybackInfo = {
 }
 
 type RenderedSizeRange = {
+  minHeight: number
+  minWidth: number
   maxHeight: number
   maxWidth: number
 }
@@ -82,6 +77,8 @@ type SceneInfo = {
 
 type AnimationSummary = {
   duration: number
+  minHeight: number
+  minWidth: number
   maxHeight: number
   maxWidth: number
   name: string
@@ -289,12 +286,40 @@ function computePlaybackInfo(spine: Spine): PlaybackInfo {
 
 function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
   return spine.skeleton.data.animations.map((animation) => {
-    const bounds = new SkinsAndAnimationBoundsProvider(animation.name, [], 0.1, false).calculateBounds(spine)
+    const maxBounds = new SkinsAndAnimationBoundsProvider(animation.name, [], 0.1, false).calculateBounds(spine)
+    const duration = animation.duration
+    const sampleCount = duration > 0 ? Math.max(2, Math.min(90, Math.ceil(duration * 30))) : 1
+    let minWidth = Number.POSITIVE_INFINITY
+    let minHeight = Number.POSITIVE_INFINITY
+
+    for (let sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex += 1) {
+      const sampleTime = duration > 0 ? (duration * sampleIndex) / sampleCount : 0
+
+      spine.state.clearTracks()
+      spine.skeleton.setToSetupPose()
+      spine.state.setAnimation(0, animation.name, false)
+
+      const entry = spine.state.getCurrent(0)
+
+      if (!entry) {
+        continue
+      }
+
+      entry.trackTime = sampleTime
+      spine.state.apply(spine.skeleton)
+
+      const bounds = getSpineBounds(spine)
+
+      minWidth = Math.min(minWidth, bounds.width)
+      minHeight = Math.min(minHeight, bounds.height)
+    }
 
     return {
-      duration: animation.duration,
-      maxHeight: bounds.height,
-      maxWidth: bounds.width,
+      duration,
+      maxHeight: maxBounds.height,
+      maxWidth: maxBounds.width,
+      minHeight: Number.isFinite(minHeight) ? minHeight : maxBounds.height,
+      minWidth: Number.isFinite(minWidth) ? minWidth : maxBounds.width,
       name: animation.name,
     }
   })
@@ -594,7 +619,6 @@ function App() {
   const [fps, setFps] = useState<number | null>(null)
   const [hasScene, setHasScene] = useState(false)
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
-  const [animationSizeRange, setAnimationSizeRange] = useState<AnimationSizeRange | null>(null)
   const [animationSummaries, setAnimationSummaries] = useState<AnimationSummary[]>([])
   const [atlasInfo, setAtlasInfo] = useState<AtlasInfo | null>(null)
   const [playbackInfo, setPlaybackInfo] = useState<PlaybackInfo | null>(null)
@@ -612,28 +636,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!spineSize || spineSize.realWidth <= 0 || spineSize.realHeight <= 0) {
-      return
-    }
-
-    setAnimationSizeRange((current) =>
-      current
-        ? {
-            maxHeight: Math.max(current.maxHeight, spineSize.realHeight),
-            maxWidth: Math.max(current.maxWidth, spineSize.realWidth),
-            minHeight: Math.min(current.minHeight, spineSize.realHeight),
-            minWidth: Math.min(current.minWidth, spineSize.realWidth),
-          }
-        : {
-            maxHeight: spineSize.realHeight,
-            maxWidth: spineSize.realWidth,
-            minHeight: spineSize.realHeight,
-            minWidth: spineSize.realWidth,
-          },
-    )
-  }, [spineSize])
-
-  useEffect(() => {
     if (!spineSize || spineSize.realtimeWidth <= 0 || spineSize.realtimeHeight <= 0) {
       return
     }
@@ -643,10 +645,14 @@ function App() {
         ? {
             maxHeight: Math.max(current.maxHeight, spineSize.realtimeHeight),
             maxWidth: Math.max(current.maxWidth, spineSize.realtimeWidth),
+            minHeight: Math.min(current.minHeight, spineSize.realtimeHeight),
+            minWidth: Math.min(current.minWidth, spineSize.realtimeWidth),
           }
         : {
             maxHeight: spineSize.realtimeHeight,
             maxWidth: spineSize.realtimeWidth,
+            minHeight: spineSize.realtimeHeight,
+            minWidth: spineSize.realtimeWidth,
           },
     )
   }, [spineSize])
@@ -659,17 +665,18 @@ function App() {
     }
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
-    setAnimationSizeRange(null)
+    setPlaybackInfo(null)
     setRenderedSizeRange(null)
-    setSpineSize(
-      updateSpineLayout(
+    const nextSpineSize = updateSpineLayout(
         scene.spine,
         scene.app.screen.width,
         scene.app.screen.height,
         userScale,
         scene.debugBounds,
-      ),
-    )
+      )
+
+    setSpineSize(nextSpineSize)
+    setPlaybackInfo(computePlaybackInfo(scene.spine))
     setSelectedAnimation(animationName)
   }
 
@@ -738,7 +745,6 @@ function App() {
       sceneRef.current = null
       setAnimationSummaries([])
       setAtlasInfo(null)
-      setAnimationSizeRange(null)
       setHasScene(false)
       setFps(null)
       setPlaybackInfo(null)
@@ -764,7 +770,6 @@ function App() {
       sceneRef.current = scene
       setAnimationSummaries(scene.animationSummaries)
       setAtlasInfo(scene.atlasInfo)
-      setAnimationSizeRange(null)
       setHasScene(true)
       setRenderedSizeRange(null)
       setAnimations(scene.animations)
@@ -807,7 +812,6 @@ function App() {
       setAtlasInfo(null)
       setFps(null)
       setHasScene(false)
-      setAnimationSizeRange(null)
       setPlaybackInfo(null)
       setRenderedSizeRange(null)
       setSceneInfo(null)
@@ -821,40 +825,42 @@ function App() {
   }
 
   const canLoad = Boolean(files.atlas && files.skeleton && files.images.length > 0) && !loading
+  const selectedAnimationSummary =
+    animationSummaries.find((summary) => summary.name === selectedAnimation) ?? null
   const minSkeletonScaled =
-    animationSizeRange && spineSize
+    selectedAnimationSummary
       ? {
           height:
-            animationSizeRange.minHeight *
+            selectedAnimationSummary.minHeight *
             getDisplayedScale(
-              animationSizeRange.minWidth,
-              animationSizeRange.minHeight,
+              selectedAnimationSummary.minWidth,
+              selectedAnimationSummary.minHeight,
               userScale,
             ),
           width:
-            animationSizeRange.minWidth *
+            selectedAnimationSummary.minWidth *
             getDisplayedScale(
-              animationSizeRange.minWidth,
-              animationSizeRange.minHeight,
+              selectedAnimationSummary.minWidth,
+              selectedAnimationSummary.minHeight,
               userScale,
             ),
         }
       : null
   const maxSkeletonScaled =
-    animationSizeRange && spineSize
+    selectedAnimationSummary
       ? {
           height:
-            animationSizeRange.maxHeight *
+            selectedAnimationSummary.maxHeight *
             getDisplayedScale(
-              animationSizeRange.maxWidth,
-              animationSizeRange.maxHeight,
+              selectedAnimationSummary.maxWidth,
+              selectedAnimationSummary.maxHeight,
               userScale,
             ),
           width:
-            animationSizeRange.maxWidth *
+            selectedAnimationSummary.maxWidth *
             getDisplayedScale(
-              animationSizeRange.maxWidth,
-              animationSizeRange.maxHeight,
+              selectedAnimationSummary.maxWidth,
+              selectedAnimationSummary.maxHeight,
               userScale,
             ),
         }
@@ -1068,8 +1074,8 @@ function App() {
                 </strong>
                 <span className="viewer-stat-note">
                   {renderedSizeRange
-                    ? `Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
-                    : 'Peak unavailable'}
+                    ? `Low ${Math.round(renderedSizeRange.minWidth)} x ${Math.round(renderedSizeRange.minHeight)} px · Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
+                    : 'Range unavailable'}
                 </span>
               </div>
               <div className="viewer-stat">
@@ -1091,8 +1097,8 @@ function App() {
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Min Skeleton</span>
                 <strong className="viewer-stat-value">
-                  {animationSizeRange
-                    ? `${Math.round(animationSizeRange.minWidth)} x ${Math.round(animationSizeRange.minHeight)} px`
+                  {selectedAnimationSummary
+                    ? `${Math.round(selectedAnimationSummary.minWidth)} x ${Math.round(selectedAnimationSummary.minHeight)} px`
                     : 'Unavailable'}
                 </strong>
                 <span className="viewer-stat-note">
@@ -1104,8 +1110,8 @@ function App() {
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Max Skeleton</span>
                 <strong className="viewer-stat-value">
-                  {animationSizeRange
-                    ? `${Math.round(animationSizeRange.maxWidth)} x ${Math.round(animationSizeRange.maxHeight)} px`
+                  {selectedAnimationSummary
+                    ? `${Math.round(selectedAnimationSummary.maxWidth)} x ${Math.round(selectedAnimationSummary.maxHeight)} px`
                     : 'Unavailable'}
                 </strong>
                 <span className="viewer-stat-note">

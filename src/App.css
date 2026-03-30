@@ -181,14 +181,6 @@
     linear-gradient(180deg, #0f1d33, #09111f 54%, #050a14);
 }
 
-.viewer-stage::after {
-  content: '';
-  position: absolute;
-  inset: 0px;
-  border: 1px solid rgba(255, 209, 102, 0.7);
-  pointer-events: none;
-}
-
 .viewer-stage canvas {
   display: block;
   width: 100%;

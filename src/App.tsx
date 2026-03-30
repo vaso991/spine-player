@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Assets, ImageSource } from 'pixi.js'
-import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8'
+import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
+import { Physics, Spine } from '@esotericsoftware/spine-pixi-v8'
 import './App.css'
 
 type SelectedFiles = {
@@ -11,6 +11,8 @@ type SelectedFiles = {
 
 type LoadedScene = {
   app: Application
+  boundsOverlay: Graphics
+  syncBoundsOverlay: () => void
   spine: Spine
   animations: string[]
   assetKeys: string[]
@@ -22,8 +24,6 @@ type SpineSize = {
   realWidth: number
   realHeight: number
 }
-
-const VIEWPORT_PADDING = 0.82
 
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file)
@@ -104,12 +104,37 @@ function classifyFiles(fileList: FileList | File[]) {
   return { atlas, skeleton, images }
 }
 
-function fitSpineToViewport(spine: Spine, width: number, height: number): SpineSize {
-  const bounds = new SetupPoseBoundsProvider(true).calculateBounds(spine)
+function getSpineBounds(spine: Spine) {
+  spine.skeleton.updateWorldTransform(Physics.update)
+
+  const bounds = spine.skeleton.getBoundsRect()
+
+  return bounds.width === Number.NEGATIVE_INFINITY
+    ? { x: 0, y: 0, width: 0, height: 0 }
+    : bounds
+}
+
+function drawBoundsOverlay(spine: Spine, boundsOverlay: Graphics | undefined, bounds = getSpineBounds(spine)) {
+  boundsOverlay?.clear()
+
+  if (!boundsOverlay || bounds.width <= 0 || bounds.height <= 0) {
+    return bounds
+  }
+
+  boundsOverlay
+    .rect(spine.position.x + bounds.x, spine.position.y + bounds.y, bounds.width, bounds.height)
+    .stroke({ alpha: 0.95, color: 0xffd166, width: 2 })
+
+  return bounds
+}
+
+function updateSpineLayout(spine: Spine, width: number, height: number, boundsOverlay?: Graphics): SpineSize {
+  const bounds = getSpineBounds(spine)
 
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(1)
+    boundsOverlay?.clear()
     return {
       canvasHeight: height,
       canvasWidth: width,
@@ -118,12 +143,12 @@ function fitSpineToViewport(spine: Spine, width: number, height: number): SpineS
     }
   }
 
-  const scale = Math.min(width / bounds.width, height / bounds.height) * VIEWPORT_PADDING
   const centerX = bounds.x + bounds.width * 0.5
   const centerY = bounds.y + bounds.height * 0.5
 
-  spine.scale.set(scale)
-  spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
+  spine.scale.set(1)
+  spine.position.set(width * 0.5 - centerX, height * 0.5 - centerY)
+  drawBoundsOverlay(spine, boundsOverlay, bounds)
 
   return {
     canvasHeight: height,
@@ -211,6 +236,10 @@ async function loadScene(
       skeleton: skeletonAssetKey,
       ticker: app.ticker,
     })
+    const boundsOverlay = new Graphics()
+    const syncBoundsOverlay = () => {
+      drawBoundsOverlay(spine, boundsOverlay)
+    }
 
     const animations = spine.skeleton.data.animations.map((animation) => animation.name)
 
@@ -219,13 +248,15 @@ async function loadScene(
     }
 
     app.stage.addChild(spine)
-    onSizeChange?.(fitSpineToViewport(spine, app.screen.width, app.screen.height))
+    app.stage.addChild(boundsOverlay)
+    onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
+    app.ticker.add(syncBoundsOverlay)
 
     app.renderer.on('resize', () => {
-      onSizeChange?.(fitSpineToViewport(spine, app.screen.width, app.screen.height))
+      onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
     })
 
-    return { app, spine, animations, assetKeys }
+    return { app, boundsOverlay, syncBoundsOverlay, spine, animations, assetKeys }
   } catch (error) {
     app.destroy(true, { children: true })
     throw error
@@ -240,7 +271,10 @@ function destroyScene(scene: LoadedScene | null) {
   }
 
   scene.spine.autoUpdate = false
+  scene.app.ticker.remove(scene.syncBoundsOverlay)
+  scene.app.stage.removeChild(scene.boundsOverlay)
   scene.app.stage.removeChild(scene.spine)
+  scene.boundsOverlay.destroy()
   scene.spine.destroy()
   scene.app.destroy(undefined, { children: false })
 
@@ -281,7 +315,9 @@ function App() {
     }
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
-    setSpineSize(fitSpineToViewport(scene.spine, scene.app.screen.width, scene.app.screen.height))
+    setSpineSize(
+      updateSpineLayout(scene.spine, scene.app.screen.width, scene.app.screen.height, scene.boundsOverlay),
+    )
     setSelectedAnimation(animationName)
   }
 

@@ -12,7 +12,7 @@ type SelectedFiles = {
 type LoadedScene = {
   app: Application
   boundsOverlay: Graphics
-  syncBoundsOverlay: () => void
+  syncSceneMetrics: () => void
   spine: Spine
   animations: string[]
   assetKeys: string[]
@@ -23,6 +23,15 @@ type SpineSize = {
   canvasHeight: number
   realWidth: number
   realHeight: number
+  realtimeWidth: number
+  realtimeHeight: number
+}
+
+type AnimationSizeRange = {
+  minWidth: number
+  minHeight: number
+  maxWidth: number
+  maxHeight: number
 }
 
 function createAssetUrl(file: File) {
@@ -121,8 +130,16 @@ function drawBoundsOverlay(spine: Spine, boundsOverlay: Graphics | undefined, bo
     return bounds
   }
 
+  const scaleX = spine.scale.x
+  const scaleY = spine.scale.y
+
   boundsOverlay
-    .rect(spine.position.x + bounds.x, spine.position.y + bounds.y, bounds.width, bounds.height)
+    .rect(
+      spine.position.x + bounds.x * scaleX,
+      spine.position.y + bounds.y * scaleY,
+      bounds.width * scaleX,
+      bounds.height * scaleY,
+    )
     .stroke({ alpha: 0.95, color: 0xffd166, width: 2 })
 
   return bounds
@@ -140,14 +157,17 @@ function updateSpineLayout(spine: Spine, width: number, height: number, boundsOv
       canvasWidth: width,
       realHeight: 0,
       realWidth: 0,
+      realtimeHeight: 0,
+      realtimeWidth: 0,
     }
   }
 
   const centerX = bounds.x + bounds.width * 0.5
   const centerY = bounds.y + bounds.height * 0.5
+  const scale = Math.min(1, width / bounds.width, height / bounds.height)
 
-  spine.scale.set(1)
-  spine.position.set(width * 0.5 - centerX, height * 0.5 - centerY)
+  spine.scale.set(scale)
+  spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
   drawBoundsOverlay(spine, boundsOverlay, bounds)
 
   return {
@@ -155,13 +175,17 @@ function updateSpineLayout(spine: Spine, width: number, height: number, boundsOv
     canvasWidth: width,
     realHeight: bounds.height,
     realWidth: bounds.width,
+    realtimeHeight: bounds.height * scale,
+    realtimeWidth: bounds.width * scale,
   }
 }
 
 async function loadScene(
   files: SelectedFiles,
   host: HTMLDivElement,
+  canvasHost: HTMLDivElement,
   onSizeChange?: (size: SpineSize) => void,
+  onFpsChange?: (fps: number) => void,
 ): Promise<LoadedScene> {
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
     throw new Error('Select an .atlas, a .skel skeleton, and at least one .png image.')
@@ -175,7 +199,7 @@ async function loadScene(
     resizeTo: host,
   })
 
-  host.replaceChildren(app.canvas)
+  canvasHost.replaceChildren(app.canvas)
 
   const tempUrls: string[] = []
   const assetKeys: string[] = []
@@ -237,8 +261,16 @@ async function loadScene(
       ticker: app.ticker,
     })
     const boundsOverlay = new Graphics()
-    const syncBoundsOverlay = () => {
-      drawBoundsOverlay(spine, boundsOverlay)
+    let lastFpsUpdate = 0
+    const syncSceneMetrics = () => {
+      onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
+
+      const now = performance.now()
+
+      if (now - lastFpsUpdate >= 250) {
+        onFpsChange?.(Math.round(app.ticker.FPS))
+        lastFpsUpdate = now
+      }
     }
 
     const animations = spine.skeleton.data.animations.map((animation) => animation.name)
@@ -250,13 +282,14 @@ async function loadScene(
     app.stage.addChild(spine)
     app.stage.addChild(boundsOverlay)
     onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
-    app.ticker.add(syncBoundsOverlay)
+    onFpsChange?.(Math.round(app.ticker.FPS))
+    app.ticker.add(syncSceneMetrics)
 
     app.renderer.on('resize', () => {
       onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
     })
 
-    return { app, boundsOverlay, syncBoundsOverlay, spine, animations, assetKeys }
+    return { app, boundsOverlay, syncSceneMetrics, spine, animations, assetKeys }
   } catch (error) {
     app.destroy(true, { children: true })
     throw error
@@ -271,7 +304,7 @@ function destroyScene(scene: LoadedScene | null) {
   }
 
   scene.spine.autoUpdate = false
-  scene.app.ticker.remove(scene.syncBoundsOverlay)
+  scene.app.ticker.remove(scene.syncSceneMetrics)
   scene.app.stage.removeChild(scene.boundsOverlay)
   scene.app.stage.removeChild(scene.spine)
   scene.boundsOverlay.destroy()
@@ -296,8 +329,12 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('Upload Spine files and press Load demo.')
+  const [fps, setFps] = useState<number | null>(null)
+  const [hasScene, setHasScene] = useState(false)
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
+  const [animationSizeRange, setAnimationSizeRange] = useState<AnimationSizeRange | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
+  const canvasHostRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
 
   useEffect(() => {
@@ -307,6 +344,28 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!spineSize || spineSize.realWidth <= 0 || spineSize.realHeight <= 0) {
+      return
+    }
+
+    setAnimationSizeRange((current) =>
+      current
+        ? {
+            maxHeight: Math.max(current.maxHeight, spineSize.realHeight),
+            maxWidth: Math.max(current.maxWidth, spineSize.realWidth),
+            minHeight: Math.min(current.minHeight, spineSize.realHeight),
+            minWidth: Math.min(current.minWidth, spineSize.realWidth),
+          }
+        : {
+            maxHeight: spineSize.realHeight,
+            maxWidth: spineSize.realWidth,
+            minHeight: spineSize.realHeight,
+            minWidth: spineSize.realWidth,
+          },
+    )
+  }, [spineSize])
+
   function updateAnimation(animationName: string, shouldLoop: boolean) {
     const scene = sceneRef.current
 
@@ -315,6 +374,7 @@ function App() {
     }
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
+    setAnimationSizeRange(null)
     setSpineSize(
       updateSpineLayout(scene.spine, scene.app.screen.width, scene.app.screen.height, scene.boundsOverlay),
     )
@@ -348,7 +408,7 @@ function App() {
   }
 
   async function handleLoad() {
-    if (!viewportRef.current) {
+    if (!viewportRef.current || !canvasHostRef.current) {
       return
     }
 
@@ -361,14 +421,25 @@ function App() {
     if (previousScene) {
       destroyScene(previousScene)
       sceneRef.current = null
+      setAnimationSizeRange(null)
+      setHasScene(false)
+      setFps(null)
     }
 
     try {
-      const scene = await loadScene(files, viewportRef.current, setSpineSize)
+      const scene = await loadScene(
+        files,
+        viewportRef.current,
+        canvasHostRef.current,
+        setSpineSize,
+        setFps,
+      )
       const firstAnimation = scene.animations[0] ?? ''
 
       scene.spine.state.timeScale = timeScale
       sceneRef.current = scene
+      setAnimationSizeRange(null)
+      setHasScene(true)
       setAnimations(scene.animations)
       setSelectedAnimation(firstAnimation)
       setLoop(true)
@@ -383,6 +454,9 @@ function App() {
 
       setAnimations([])
       setSelectedAnimation('')
+      setFps(null)
+      setHasScene(false)
+      setAnimationSizeRange(null)
       setSpineSize(null)
       setError(message)
       setStatus('Load failed.')
@@ -527,20 +601,60 @@ function App() {
 
         <div className="viewer-panel">
           <div className="viewer-chrome">
-            <span>{selectedAnimation || 'idle'}</span>
-            <span className="viewer-size">
-              {spineSize
-                ? `Real size ${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
-                : 'Real size unavailable'}
-            </span>
-            <span className="viewer-size">
-              {spineSize
-                ? `Canvas size ${Math.round(spineSize.canvasWidth)} x ${Math.round(spineSize.canvasHeight)} px`
-                : 'Canvas size unavailable'}
-            </span>
+            <div className="viewer-heading">
+              <span className="viewer-kicker">Active Animation</span>
+              <strong>{selectedAnimation || 'idle'}</strong>
+            </div>
+            <div className="viewer-metrics">
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Real Size</span>
+                <strong className="viewer-stat-value">
+                  {spineSize
+                    ? `${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Realtime Size</span>
+                <strong className="viewer-stat-value">
+                  {spineSize
+                    ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Canvas Size</span>
+                <strong className="viewer-stat-value">
+                  {spineSize
+                    ? `${Math.round(spineSize.canvasWidth)} x ${Math.round(spineSize.canvasHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Min Real Size</span>
+                <strong className="viewer-stat-value">
+                  {animationSizeRange
+                    ? `${Math.round(animationSizeRange.minWidth)} x ${Math.round(animationSizeRange.minHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Max Real Size</span>
+                <strong className="viewer-stat-value">
+                  {animationSizeRange
+                    ? `${Math.round(animationSizeRange.maxWidth)} x ${Math.round(animationSizeRange.maxHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat viewer-stat-fps">
+                <span className="viewer-stat-label">FPS</span>
+                <strong className="viewer-stat-value">{fps === null ? 'Unavailable' : fps}</strong>
+              </div>
+            </div>
           </div>
           <div ref={viewportRef} className="viewer-stage">
-            <div className="viewer-placeholder">
+            <div ref={canvasHostRef} className="viewer-canvas-host" />
+            <div className={`viewer-placeholder${hasScene ? ' viewer-placeholder-hidden' : ''}`}>
               <p>Load local Spine assets to render the player.</p>
             </div>
           </div>

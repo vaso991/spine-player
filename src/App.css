@@ -156,20 +156,89 @@
 }
 
 .viewer-chrome {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
   border-bottom: 1px solid rgba(188, 207, 224, 0.14);
-  color: #a9bdd2;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.78rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at top left, rgba(127, 255, 212, 0.1), transparent 42%);
 }
 
-.viewer-size {
-  color: #d7e8f8;
+.viewer-heading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.viewer-kicker {
+  color: #8aa2b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.viewer-heading strong {
+  color: #f6fbff;
+  font-size: 1.2rem;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.viewer-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
+}
+
+.viewer-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid rgba(188, 207, 224, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(13, 27, 47, 0.92), rgba(8, 16, 30, 0.9)),
+    linear-gradient(120deg, rgba(127, 255, 212, 0.05), rgba(255, 209, 102, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.viewer-stat-label {
+  color: #7f97ad;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.viewer-stat-value {
+  color: #eff8ff;
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.viewer-stat-fps {
+  background:
+    linear-gradient(180deg, rgba(37, 30, 8, 0.95), rgba(17, 14, 6, 0.92)),
+    linear-gradient(120deg, rgba(255, 209, 102, 0.18), rgba(255, 123, 84, 0.08));
+}
+
+.viewer-stat-fps .viewer-stat-label {
+  color: #d7b36a;
+}
+
+.viewer-stat-fps .viewer-stat-value {
+  color: #ffe29f;
 }
 
 .viewer-stage {
@@ -179,6 +248,11 @@
     radial-gradient(circle at top, rgba(83, 173, 255, 0.24), transparent 38%),
     radial-gradient(circle at bottom right, rgba(127, 255, 212, 0.18), transparent 24%),
     linear-gradient(180deg, #0f1d33, #09111f 54%, #050a14);
+}
+
+.viewer-canvas-host {
+  position: absolute;
+  inset: 0;
 }
 
 .viewer-stage canvas {
@@ -197,6 +271,11 @@
   color: #6e89a0;
 }
 
+.viewer-placeholder-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     padding: 16px;
@@ -208,5 +287,9 @@
 
   .viewer-stage {
     min-height: 480px;
+  }
+
+  .viewer-chrome {
+    grid-template-columns: 1fr;
   }
 }

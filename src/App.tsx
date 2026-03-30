@@ -13,6 +13,9 @@ type LoadedScene = {
   app: Application
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
+  requestedScale: {
+    value: number
+  }
   syncSceneMetrics: () => void
   spine: Spine
   animations: string[]
@@ -71,8 +74,6 @@ type SceneInfo = {
   constraintCount: number
   dopesheetFps: number | null
   eventCount: number
-  safeContainerHeight: number
-  safeContainerWidth: number
   skinCount: number
   slotCount: number
   textureMemoryBytes: number | null
@@ -84,6 +85,8 @@ type AnimationSummary = {
   maxWidth: number
   name: string
 }
+
+const DEFAULT_USER_SCALE = 1
 
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file)
@@ -299,39 +302,33 @@ function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
 function getDisplayedScale(
   boundsWidth: number,
   boundsHeight: number,
-  canvasWidth: number,
-  canvasHeight: number,
-  atlasScale = 1,
+  requestedScale = 1,
 ) {
-  const normalizedAtlasScale = atlasScale > 0 ? atlasScale : 1
+  const normalizedRequestedScale = requestedScale > 0 ? requestedScale : 1
 
   if (boundsWidth <= 0 || boundsHeight <= 0) {
-    return normalizedAtlasScale
+    return normalizedRequestedScale
   }
 
-  return Math.min(
-    normalizedAtlasScale,
-    canvasWidth / boundsWidth,
-    canvasHeight / boundsHeight,
-  )
+  return normalizedRequestedScale
 }
 
 function updateSpineLayout(
   spine: Spine,
   width: number,
   height: number,
-  atlasScale = 1,
+  requestedScale = 1,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
-  const normalizedAtlasScale = atlasScale > 0 ? atlasScale : 1
+  const normalizedRequestedScale = requestedScale > 0 ? requestedScale : 1
 
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
-    spine.scale.set(normalizedAtlasScale)
+    spine.scale.set(normalizedRequestedScale)
     return {
       canvasHeight: height,
       canvasWidth: width,
-      currentScale: normalizedAtlasScale,
+      currentScale: normalizedRequestedScale,
       displayOffsetX: width * 0.5,
       displayOffsetY: height * 0.72,
       overflowingCanvas: false,
@@ -346,7 +343,7 @@ function updateSpineLayout(
 
   const centerX = bounds.x + bounds.width * 0.5
   const centerY = bounds.y + bounds.height * 0.5
-  const scale = getDisplayedScale(bounds.width, bounds.height, width, height, normalizedAtlasScale)
+  const scale = getDisplayedScale(bounds.width, bounds.height, normalizedRequestedScale)
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
@@ -357,7 +354,7 @@ function updateSpineLayout(
     currentScale: scale,
     displayOffsetX: spine.position.x + bounds.x * scale,
     displayOffsetY: spine.position.y + bounds.y * scale,
-    overflowingCanvas: scale < normalizedAtlasScale,
+    overflowingCanvas: bounds.width * scale > width || bounds.height * scale > height,
     originX: bounds.x,
     originY: bounds.y,
     realHeight: bounds.height,
@@ -371,6 +368,7 @@ async function loadScene(
   files: SelectedFiles,
   host: HTMLDivElement,
   canvasHost: HTMLDivElement,
+  requestedScale = DEFAULT_USER_SCALE,
   onSizeChange?: (size: SpineSize) => void,
   onFpsChange?: (fps: number) => void,
   onPlaybackChange?: (playback: PlaybackInfo) => void,
@@ -450,6 +448,7 @@ async function loadScene(
       ticker: app.ticker,
     })
     const animationSummaries = computeAnimationSummaries(spine)
+    const requestedScaleState = { value: requestedScale }
     let lastFpsUpdate = 0
     const syncSceneMetrics = () => {
       onSizeChange?.(
@@ -457,7 +456,7 @@ async function loadScene(
           spine,
           app.screen.width,
           app.screen.height,
-          atlasInfo?.scale ?? 1,
+          requestedScaleState.value,
         ),
       )
       onPlaybackChange?.(computePlaybackInfo(spine))
@@ -482,7 +481,7 @@ async function loadScene(
         spine,
         app.screen.width,
         app.screen.height,
-        atlasInfo?.scale ?? 1,
+        requestedScaleState.value,
       ),
     )
     onFpsChange?.(Math.round(app.ticker.FPS))
@@ -495,7 +494,7 @@ async function loadScene(
           spine,
           app.screen.width,
           app.screen.height,
-          atlasInfo?.scale ?? 1,
+          requestedScaleState.value,
         ),
       )
     })
@@ -505,6 +504,7 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      requestedScale: requestedScaleState,
       syncSceneMetrics,
       spine,
       animations,
@@ -542,6 +542,7 @@ function App() {
   const [animations, setAnimations] = useState<string[]>([])
   const [selectedAnimation, setSelectedAnimation] = useState('')
   const [loop, setLoop] = useState(true)
+  const [userScale, setUserScale] = useState(DEFAULT_USER_SCALE)
   const [timeScale, setTimeScale] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -621,7 +622,7 @@ function App() {
         scene.spine,
         scene.app.screen.width,
         scene.app.screen.height,
-        scene.atlasInfo?.scale ?? 1,
+        userScale,
       ),
     )
     setSelectedAnimation(animationName)
@@ -637,6 +638,28 @@ function App() {
     }
 
     scene.spine.state.timeScale = nextTimeScale
+  }
+
+  function updateUserScale(nextScale: number) {
+    const scene = sceneRef.current
+    const normalizedScale = Number.isFinite(nextScale) && nextScale > 0 ? nextScale : DEFAULT_USER_SCALE
+
+    setUserScale(normalizedScale)
+
+    if (!scene) {
+      return
+    }
+
+    scene.requestedScale.value = normalizedScale
+
+    setSpineSize(
+      updateSpineLayout(
+        scene.spine,
+        scene.app.screen.width,
+        scene.app.screen.height,
+        normalizedScale,
+      ),
+    )
   }
 
   function applyCombinedFiles(fileList: FileList | null) {
@@ -675,6 +698,7 @@ function App() {
       setPlaybackInfo(null)
       setRenderedSizeRange(null)
       setSceneInfo(null)
+      setUserScale(DEFAULT_USER_SCALE)
     }
 
     try {
@@ -682,11 +706,13 @@ function App() {
         files,
         viewportRef.current,
         canvasHostRef.current,
+        files.atlas ? parseAtlasInfo(await files.atlas.text())?.scale ?? DEFAULT_USER_SCALE : DEFAULT_USER_SCALE,
         setSpineSize,
         setFps,
         setPlaybackInfo,
       )
       const firstAnimation = scene.animations[0] ?? ''
+      const nextUserScale = scene.atlasInfo?.scale ?? DEFAULT_USER_SCALE
 
       scene.spine.state.timeScale = timeScale
       sceneRef.current = scene
@@ -697,6 +723,7 @@ function App() {
       setRenderedSizeRange(null)
       setAnimations(scene.animations)
       setSelectedAnimation(firstAnimation)
+      setUserScale(nextUserScale)
       setSceneInfo({
         atlasUtilization:
           scene.atlasInfo && scene.atlasInfo.totalPageArea > 0
@@ -714,14 +741,6 @@ function App() {
           scene.spine.skeleton.data.physicsConstraints.length,
         dopesheetFps: scene.spine.skeleton.data.fps > 0 ? scene.spine.skeleton.data.fps : null,
         eventCount: scene.spine.skeleton.data.events.length,
-        safeContainerHeight: scene.animationSummaries.reduce(
-          (max, summary) => Math.max(max, summary.maxHeight * (scene.atlasInfo?.scale ?? 1)),
-          0,
-        ),
-        safeContainerWidth: scene.animationSummaries.reduce(
-          (max, summary) => Math.max(max, summary.maxWidth * (scene.atlasInfo?.scale ?? 1)),
-          0,
-        ),
         skinCount: scene.spine.skeleton.data.skins.length,
         slotCount: scene.spine.skeleton.data.slots.length,
         textureMemoryBytes: scene.atlasInfo?.textureMemoryBytes ?? null,
@@ -747,6 +766,7 @@ function App() {
       setRenderedSizeRange(null)
       setSceneInfo(null)
       setSpineSize(null)
+      setUserScale(DEFAULT_USER_SCALE)
       setError(message)
       setStatus('Load failed.')
     } finally {
@@ -763,18 +783,14 @@ function App() {
             getDisplayedScale(
               spineSize.realWidth,
               spineSize.realHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo.scale ?? 1,
+              userScale,
             ),
           width:
             atlasInfo.pageWidth *
             getDisplayedScale(
               spineSize.realWidth,
               spineSize.realHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo.scale ?? 1,
+              userScale,
             ),
         }
       : null
@@ -786,18 +802,14 @@ function App() {
             getDisplayedScale(
               animationSizeRange.minWidth,
               animationSizeRange.minHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo?.scale ?? 1,
+              userScale,
             ),
           width:
             animationSizeRange.minWidth *
             getDisplayedScale(
               animationSizeRange.minWidth,
               animationSizeRange.minHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo?.scale ?? 1,
+              userScale,
             ),
         }
       : null
@@ -809,21 +821,25 @@ function App() {
             getDisplayedScale(
               animationSizeRange.maxWidth,
               animationSizeRange.maxHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo?.scale ?? 1,
+              userScale,
             ),
           width:
             animationSizeRange.maxWidth *
             getDisplayedScale(
               animationSizeRange.maxWidth,
               animationSizeRange.maxHeight,
-              spineSize.canvasWidth,
-              spineSize.canvasHeight,
-              atlasInfo?.scale ?? 1,
+              userScale,
             ),
         }
       : null
+  const safeContainerSize =
+    animationSummaries.length > 0
+      ? {
+          height: Math.max(...animationSummaries.map((summary) => summary.maxHeight * userScale)),
+          width: Math.max(...animationSummaries.map((summary) => summary.maxWidth * userScale)),
+        }
+      : null
+  const defaultScale = atlasInfo?.scale ?? DEFAULT_USER_SCALE
 
   return (
     <main className="app-shell">
@@ -934,7 +950,16 @@ function App() {
           </label>
 
           <label className="field">
-            <span>Animation speed</span>
+            <div className="field-header">
+              <span>Animation speed</span>
+              <button
+                type="button"
+                className="field-reset"
+                onClick={() => updateTimeScale(1)}
+              >
+                Reset
+              </button>
+            </div>
             <div className="timescale-row">
               <input
                 type="range"
@@ -954,6 +979,41 @@ function App() {
               />
             </div>
             <small>`1` is normal speed, `0.5` is half speed, `2` is double speed.</small>
+          </label>
+
+          <label className="field">
+            <div className="field-header">
+              <span>Animation scale</span>
+              <button
+                type="button"
+                className="field-reset"
+                onClick={() => updateUserScale(defaultScale)}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="timescale-row">
+              <input
+                type="range"
+                min="0.05"
+                max="3"
+                step="0.01"
+                value={userScale}
+                onChange={(event) => updateUserScale(Number(event.target.value))}
+              />
+              <input
+                type="number"
+                min="0.05"
+                max="3"
+                step="0.01"
+                value={userScale}
+                onChange={(event) => updateUserScale(Number(event.target.value))}
+              />
+            </div>
+            <small>
+              Defaults to atlas scale
+              {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? ` (${atlasInfo.scale})` : ''}.
+            </small>
           </label>
         </aside>
 
@@ -1069,12 +1129,6 @@ function App() {
                 </strong>
               </div>
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Overflow</span>
-                <strong className="viewer-stat-value">
-                  {spineSize ? (spineSize.overflowingCanvas ? 'Scaled Down' : 'Fits') : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
                 <span className="viewer-stat-label">Bounds Origin</span>
                 <strong className="viewer-stat-value">
                   {spineSize
@@ -1093,8 +1147,8 @@ function App() {
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Safe Web Size</span>
                 <strong className="viewer-stat-value">
-                  {sceneInfo
-                    ? `${Math.round(sceneInfo.safeContainerWidth)} x ${Math.round(sceneInfo.safeContainerHeight)} px`
+                  {safeContainerSize
+                    ? `${Math.round(safeContainerSize.width)} x ${Math.round(safeContainerSize.height)} px`
                     : 'Unavailable'}
                 </strong>
               </div>

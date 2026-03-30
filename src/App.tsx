@@ -215,7 +215,6 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('Upload Spine files and press Load demo.')
-  const [scaleHint, setScaleHint] = useState('1.00x')
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
 
@@ -274,7 +273,6 @@ function App() {
       setAnimations(scene.animations)
       setSelectedAnimation(firstAnimation)
       setLoop(true)
-      setScaleHint(`${scene.spine.scale.x.toFixed(2)}x`)
       setStatus(
         scene.animations.length > 0
           ? `Loaded ${scene.animations.length} animation${scene.animations.length === 1 ? '' : 's'}.`

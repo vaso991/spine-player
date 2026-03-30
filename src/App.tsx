@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
-import { Physics, Spine } from '@esotericsoftware/spine-pixi-v8'
+import { Application, Assets, ImageSource } from 'pixi.js'
+import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8'
 import './App.css'
 
 type SelectedFiles = {
@@ -11,8 +11,8 @@ type SelectedFiles = {
 
 type LoadedScene = {
   app: Application
+  animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
-  boundsOverlay: Graphics
   syncSceneMetrics: () => void
   spine: Spine
   animations: string[]
@@ -22,6 +22,12 @@ type LoadedScene = {
 type SpineSize = {
   canvasWidth: number
   canvasHeight: number
+  currentScale: number
+  displayOffsetX: number
+  displayOffsetY: number
+  overflowingCanvas: boolean
+  originX: number
+  originY: number
   realWidth: number
   realHeight: number
   realtimeWidth: number
@@ -37,8 +43,46 @@ type AnimationSizeRange = {
 
 type AtlasInfo = {
   pageHeight: number
+  pageCount: number
   pageWidth: number
+  regionCount: number
   scale: number | null
+  textureMemoryBytes: number
+  totalPageArea: number
+  usedArea: number
+}
+
+type PlaybackInfo = {
+  currentTime: number
+  duration: number
+  loopCount: number
+  progress: number
+}
+
+type RenderedSizeRange = {
+  maxHeight: number
+  maxWidth: number
+}
+
+type SceneInfo = {
+  atlasUtilization: number | null
+  attachmentCount: number
+  boneCount: number
+  constraintCount: number
+  dopesheetFps: number | null
+  eventCount: number
+  safeContainerHeight: number
+  safeContainerWidth: number
+  skinCount: number
+  slotCount: number
+  textureMemoryBytes: number | null
+}
+
+type AnimationSummary = {
+  duration: number
+  maxHeight: number
+  maxWidth: number
+  name: string
 }
 
 function createAssetUrl(file: File) {
@@ -96,27 +140,85 @@ function getAtlasPageNames(atlasText: string) {
 
 function parseAtlasInfo(atlasText: string): AtlasInfo | null {
   const lines = atlasText.split(/\r\n|\r|\n/).map((line) => line.trim())
-  const sizeLine = lines.find((line) => line.toLowerCase().startsWith('size:'))
+  let mode: 'pageHeader' | 'pageMeta' | 'regionMeta' = 'pageHeader'
+  let firstPageWidth = 0
+  let firstPageHeight = 0
+  let pageCount = 0
+  let regionCount = 0
+  let scale: number | null = null
+  let totalPageArea = 0
+  let usedArea = 0
 
-  if (!sizeLine) {
-    return null
+  for (const line of lines) {
+    if (!line) {
+      mode = 'pageHeader'
+      continue
+    }
+
+    if (mode === 'pageHeader') {
+      pageCount += 1
+      mode = 'pageMeta'
+      continue
+    }
+
+    if (mode === 'pageMeta') {
+      if (!line.includes(':')) {
+        regionCount += 1
+        mode = 'regionMeta'
+        continue
+      }
+
+      const sizeMatch = line.match(/^size:\s*([0-9.]+)\s*,\s*([0-9.]+)$/i)
+
+      if (sizeMatch) {
+        const pageWidth = Number(sizeMatch[1])
+        const pageHeight = Number(sizeMatch[2])
+
+        if (firstPageWidth === 0 && firstPageHeight === 0) {
+          firstPageWidth = pageWidth
+          firstPageHeight = pageHeight
+        }
+
+        totalPageArea += pageWidth * pageHeight
+        continue
+      }
+
+      const scaleMatch = line.match(/^scale:\s*([0-9.]+)$/i)
+
+      if (scaleMatch) {
+        const nextScale = Number(scaleMatch[1])
+
+        scale = Number.isFinite(nextScale) ? nextScale : scale
+      }
+
+      continue
+    }
+
+    if (!line.includes(':')) {
+      regionCount += 1
+      continue
+    }
+
+    const boundsMatch = line.match(/^bounds:\s*[0-9.]+\s*,\s*[0-9.]+\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)$/i)
+
+    if (boundsMatch) {
+      usedArea += Number(boundsMatch[1]) * Number(boundsMatch[2])
+    }
   }
 
-  const sizeMatch = sizeLine.match(/^size:\s*([0-9.]+)\s*,\s*([0-9.]+)$/i)
-
-  if (!sizeMatch) {
+  if (firstPageWidth <= 0 || firstPageHeight <= 0) {
     return null
   }
-
-  const scaleLine = lines.find((line) => line.toLowerCase().startsWith('scale:'))
-  const pageWidth = Number(sizeMatch[1])
-  const pageHeight = Number(sizeMatch[2])
-  const scale = scaleLine ? Number(scaleLine.replace(/^scale:\s*/i, '')) : null
 
   return {
-    pageHeight,
-    pageWidth,
-    scale: Number.isFinite(scale) ? scale : null,
+    pageCount,
+    pageHeight: firstPageHeight,
+    pageWidth: firstPageWidth,
+    regionCount,
+    scale,
+    textureMemoryBytes: totalPageArea > 0 ? totalPageArea * 4 : firstPageWidth * firstPageHeight * 4,
+    totalPageArea,
+    usedArea,
   }
 }
 
@@ -156,26 +258,42 @@ function getSpineBounds(spine: Spine) {
     : bounds
 }
 
-function drawBoundsOverlay(spine: Spine, boundsOverlay: Graphics | undefined, bounds = getSpineBounds(spine)) {
-  boundsOverlay?.clear()
+function computePlaybackInfo(spine: Spine): PlaybackInfo {
+  const entry = spine.state.getCurrent(0)
 
-  if (!boundsOverlay || bounds.width <= 0 || bounds.height <= 0) {
-    return bounds
+  if (!entry || !entry.animation) {
+    return {
+      currentTime: 0,
+      duration: 0,
+      loopCount: 0,
+      progress: 0,
+    }
   }
 
-  const scaleX = spine.scale.x
-  const scaleY = spine.scale.y
+  const duration = Math.max(entry.animationEnd - entry.animationStart, entry.animation.duration, 0)
+  const currentTime = entry.getAnimationTime()
+  const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0
+  const loopCount = entry.loop && duration > 0 ? Math.floor(entry.trackTime / duration) : Number(entry.isComplete())
 
-  boundsOverlay
-    .rect(
-      spine.position.x + bounds.x * scaleX,
-      spine.position.y + bounds.y * scaleY,
-      bounds.width * scaleX,
-      bounds.height * scaleY,
-    )
-    .stroke({ alpha: 0.95, color: 0xffd166, width: 2 })
+  return {
+    currentTime,
+    duration,
+    loopCount,
+    progress,
+  }
+}
 
-  return bounds
+function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
+  return spine.skeleton.data.animations.map((animation) => {
+    const bounds = new SkinsAndAnimationBoundsProvider(animation.name, [], 0.1, false).calculateBounds(spine)
+
+    return {
+      duration: animation.duration,
+      maxHeight: bounds.height,
+      maxWidth: bounds.width,
+      name: animation.name,
+    }
+  })
 }
 
 function getDisplayedScale(
@@ -203,7 +321,6 @@ function updateSpineLayout(
   width: number,
   height: number,
   atlasScale = 1,
-  boundsOverlay?: Graphics,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
   const normalizedAtlasScale = atlasScale > 0 ? atlasScale : 1
@@ -211,10 +328,15 @@ function updateSpineLayout(
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(normalizedAtlasScale)
-    boundsOverlay?.clear()
     return {
       canvasHeight: height,
       canvasWidth: width,
+      currentScale: normalizedAtlasScale,
+      displayOffsetX: width * 0.5,
+      displayOffsetY: height * 0.72,
+      overflowingCanvas: false,
+      originX: 0,
+      originY: 0,
       realHeight: 0,
       realWidth: 0,
       realtimeHeight: 0,
@@ -228,11 +350,16 @@ function updateSpineLayout(
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
-  drawBoundsOverlay(spine, boundsOverlay, bounds)
 
   return {
     canvasHeight: height,
     canvasWidth: width,
+    currentScale: scale,
+    displayOffsetX: spine.position.x + bounds.x * scale,
+    displayOffsetY: spine.position.y + bounds.y * scale,
+    overflowingCanvas: scale < normalizedAtlasScale,
+    originX: bounds.x,
+    originY: bounds.y,
     realHeight: bounds.height,
     realWidth: bounds.width,
     realtimeHeight: bounds.height * scale,
@@ -246,6 +373,7 @@ async function loadScene(
   canvasHost: HTMLDivElement,
   onSizeChange?: (size: SpineSize) => void,
   onFpsChange?: (fps: number) => void,
+  onPlaybackChange?: (playback: PlaybackInfo) => void,
 ): Promise<LoadedScene> {
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
     throw new Error('Select an .atlas, a .skel skeleton, and at least one .png image.')
@@ -321,7 +449,7 @@ async function loadScene(
       skeleton: skeletonAssetKey,
       ticker: app.ticker,
     })
-    const boundsOverlay = new Graphics()
+    const animationSummaries = computeAnimationSummaries(spine)
     let lastFpsUpdate = 0
     const syncSceneMetrics = () => {
       onSizeChange?.(
@@ -330,9 +458,9 @@ async function loadScene(
           app.screen.width,
           app.screen.height,
           atlasInfo?.scale ?? 1,
-          boundsOverlay,
         ),
       )
+      onPlaybackChange?.(computePlaybackInfo(spine))
 
       const now = performance.now()
 
@@ -349,17 +477,16 @@ async function loadScene(
     }
 
     app.stage.addChild(spine)
-    app.stage.addChild(boundsOverlay)
     onSizeChange?.(
       updateSpineLayout(
         spine,
         app.screen.width,
         app.screen.height,
         atlasInfo?.scale ?? 1,
-        boundsOverlay,
       ),
     )
     onFpsChange?.(Math.round(app.ticker.FPS))
+    onPlaybackChange?.(computePlaybackInfo(spine))
     app.ticker.add(syncSceneMetrics)
 
     app.renderer.on('resize', () => {
@@ -369,12 +496,19 @@ async function loadScene(
           app.screen.width,
           app.screen.height,
           atlasInfo?.scale ?? 1,
-          boundsOverlay,
         ),
       )
     })
 
-    return { app, atlasInfo, boundsOverlay, syncSceneMetrics, spine, animations, assetKeys }
+    return {
+      app,
+      animationSummaries,
+      atlasInfo,
+      assetKeys,
+      syncSceneMetrics,
+      spine,
+      animations,
+    }
   } catch (error) {
     app.destroy(true, { children: true })
     throw error
@@ -390,9 +524,7 @@ function destroyScene(scene: LoadedScene | null) {
 
   scene.spine.autoUpdate = false
   scene.app.ticker.remove(scene.syncSceneMetrics)
-  scene.app.stage.removeChild(scene.boundsOverlay)
   scene.app.stage.removeChild(scene.spine)
-  scene.boundsOverlay.destroy()
   scene.spine.destroy()
   scene.app.destroy(undefined, { children: false })
 
@@ -418,7 +550,11 @@ function App() {
   const [hasScene, setHasScene] = useState(false)
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
   const [animationSizeRange, setAnimationSizeRange] = useState<AnimationSizeRange | null>(null)
+  const [animationSummaries, setAnimationSummaries] = useState<AnimationSummary[]>([])
   const [atlasInfo, setAtlasInfo] = useState<AtlasInfo | null>(null)
+  const [playbackInfo, setPlaybackInfo] = useState<PlaybackInfo | null>(null)
+  const [renderedSizeRange, setRenderedSizeRange] = useState<RenderedSizeRange | null>(null)
+  const [sceneInfo, setSceneInfo] = useState<SceneInfo | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const canvasHostRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
@@ -452,6 +588,24 @@ function App() {
     )
   }, [spineSize])
 
+  useEffect(() => {
+    if (!spineSize || spineSize.realtimeWidth <= 0 || spineSize.realtimeHeight <= 0) {
+      return
+    }
+
+    setRenderedSizeRange((current) =>
+      current
+        ? {
+            maxHeight: Math.max(current.maxHeight, spineSize.realtimeHeight),
+            maxWidth: Math.max(current.maxWidth, spineSize.realtimeWidth),
+          }
+        : {
+            maxHeight: spineSize.realtimeHeight,
+            maxWidth: spineSize.realtimeWidth,
+          },
+    )
+  }, [spineSize])
+
   function updateAnimation(animationName: string, shouldLoop: boolean) {
     const scene = sceneRef.current
 
@@ -461,13 +615,13 @@ function App() {
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
     setAnimationSizeRange(null)
+    setRenderedSizeRange(null)
     setSpineSize(
       updateSpineLayout(
         scene.spine,
         scene.app.screen.width,
         scene.app.screen.height,
         scene.atlasInfo?.scale ?? 1,
-        scene.boundsOverlay,
       ),
     )
     setSelectedAnimation(animationName)
@@ -513,10 +667,14 @@ function App() {
     if (previousScene) {
       destroyScene(previousScene)
       sceneRef.current = null
+      setAnimationSummaries([])
       setAtlasInfo(null)
       setAnimationSizeRange(null)
       setHasScene(false)
       setFps(null)
+      setPlaybackInfo(null)
+      setRenderedSizeRange(null)
+      setSceneInfo(null)
     }
 
     try {
@@ -526,16 +684,48 @@ function App() {
         canvasHostRef.current,
         setSpineSize,
         setFps,
+        setPlaybackInfo,
       )
       const firstAnimation = scene.animations[0] ?? ''
 
       scene.spine.state.timeScale = timeScale
       sceneRef.current = scene
+      setAnimationSummaries(scene.animationSummaries)
       setAtlasInfo(scene.atlasInfo)
       setAnimationSizeRange(null)
       setHasScene(true)
+      setRenderedSizeRange(null)
       setAnimations(scene.animations)
       setSelectedAnimation(firstAnimation)
+      setSceneInfo({
+        atlasUtilization:
+          scene.atlasInfo && scene.atlasInfo.totalPageArea > 0
+            ? scene.atlasInfo.usedArea / scene.atlasInfo.totalPageArea
+            : null,
+        attachmentCount: scene.spine.skeleton.data.skins.reduce(
+          (total, skin) => total + skin.getAttachments().length,
+          0,
+        ),
+        boneCount: scene.spine.skeleton.data.bones.length,
+        constraintCount:
+          scene.spine.skeleton.data.ikConstraints.length +
+          scene.spine.skeleton.data.transformConstraints.length +
+          scene.spine.skeleton.data.pathConstraints.length +
+          scene.spine.skeleton.data.physicsConstraints.length,
+        dopesheetFps: scene.spine.skeleton.data.fps > 0 ? scene.spine.skeleton.data.fps : null,
+        eventCount: scene.spine.skeleton.data.events.length,
+        safeContainerHeight: scene.animationSummaries.reduce(
+          (max, summary) => Math.max(max, summary.maxHeight * (scene.atlasInfo?.scale ?? 1)),
+          0,
+        ),
+        safeContainerWidth: scene.animationSummaries.reduce(
+          (max, summary) => Math.max(max, summary.maxWidth * (scene.atlasInfo?.scale ?? 1)),
+          0,
+        ),
+        skinCount: scene.spine.skeleton.data.skins.length,
+        slotCount: scene.spine.skeleton.data.slots.length,
+        textureMemoryBytes: scene.atlasInfo?.textureMemoryBytes ?? null,
+      })
       setLoop(true)
       setStatus(
         scene.animations.length > 0
@@ -547,11 +737,15 @@ function App() {
         caughtError instanceof Error ? caughtError.message : 'Failed to load Spine assets.'
 
       setAnimations([])
+      setAnimationSummaries([])
       setSelectedAnimation('')
       setAtlasInfo(null)
       setFps(null)
       setHasScene(false)
       setAnimationSizeRange(null)
+      setPlaybackInfo(null)
+      setRenderedSizeRange(null)
+      setSceneInfo(null)
       setSpineSize(null)
       setError(message)
       setStatus('Load failed.')
@@ -561,6 +755,29 @@ function App() {
   }
 
   const canLoad = Boolean(files.atlas && files.skeleton && files.images.length > 0) && !loading
+  const atlasPageScaled =
+    atlasInfo && spineSize
+      ? {
+          height:
+            atlasInfo.pageHeight *
+            getDisplayedScale(
+              spineSize.realWidth,
+              spineSize.realHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo.scale ?? 1,
+            ),
+          width:
+            atlasInfo.pageWidth *
+            getDisplayedScale(
+              spineSize.realWidth,
+              spineSize.realHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo.scale ?? 1,
+            ),
+        }
+      : null
   const minSkeletonScaled =
     animationSizeRange && spineSize
       ? {
@@ -742,11 +959,11 @@ function App() {
 
         <div className="viewer-panel">
           <div className="viewer-chrome">
-            <div className="viewer-heading">
-              <span className="viewer-kicker">Active Animation</span>
-              <strong>{selectedAnimation || 'idle'}</strong>
-            </div>
             <div className="viewer-metrics">
+              <div className="viewer-stat viewer-stat-primary">
+                <span className="viewer-stat-label">Active Animation</span>
+                <strong className="viewer-stat-value">{selectedAnimation || 'idle'}</strong>
+              </div>
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Skeleton Bounds</span>
                 <strong className="viewer-stat-value">
@@ -762,6 +979,11 @@ function App() {
                     ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
                     : 'Unavailable'}
                 </strong>
+                <span className="viewer-stat-note">
+                  {renderedSizeRange
+                    ? `Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
+                    : 'Peak unavailable'}
+                </span>
               </div>
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Atlas Page</span>
@@ -770,6 +992,11 @@ function App() {
                     ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
                     : 'Unavailable'}
                 </strong>
+                <span className="viewer-stat-note">
+                  {atlasPageScaled
+                    ? `Scaled ${Math.round(atlasPageScaled.width)} x ${Math.round(atlasPageScaled.height)} px`
+                    : 'Scaled unavailable'}
+                </span>
               </div>
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Atlas Scale</span>
@@ -808,6 +1035,129 @@ function App() {
               <div className="viewer-stat viewer-stat-fps">
                 <span className="viewer-stat-label">FPS</span>
                 <strong className="viewer-stat-value">{fps === null ? 'Unavailable' : fps}</strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Current Scale</span>
+                <strong className="viewer-stat-value">
+                  {spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Current Time</span>
+                <strong className="viewer-stat-value">
+                  {playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
+                </strong>
+                <span className="viewer-stat-note">
+                  {playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
+                </span>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Animation Duration</span>
+                <strong className="viewer-stat-value">
+                  {playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
+                </strong>
+                <span className="viewer-stat-note">
+                  {playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
+                </span>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Bounds Aspect</span>
+                <strong className="viewer-stat-value">
+                  {spineSize && spineSize.realHeight > 0
+                    ? (spineSize.realWidth / spineSize.realHeight).toFixed(3)
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Overflow</span>
+                <strong className="viewer-stat-value">
+                  {spineSize ? (spineSize.overflowingCanvas ? 'Scaled Down' : 'Fits') : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Bounds Origin</span>
+                <strong className="viewer-stat-value">
+                  {spineSize
+                    ? `${Math.round(spineSize.originX)}, ${Math.round(spineSize.originY)}`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Display Offset</span>
+                <strong className="viewer-stat-value">
+                  {spineSize
+                    ? `${Math.round(spineSize.displayOffsetX)}, ${Math.round(spineSize.displayOffsetY)}`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Safe Web Size</span>
+                <strong className="viewer-stat-value">
+                  {sceneInfo
+                    ? `${Math.round(sceneInfo.safeContainerWidth)} x ${Math.round(sceneInfo.safeContainerHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Bones / Slots</span>
+                <strong className="viewer-stat-value">
+                  {sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
+                </strong>
+                <span className="viewer-stat-note">
+                  {sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
+                </span>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Attachments / Events</span>
+                <strong className="viewer-stat-value">
+                  {sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
+                </strong>
+                <span className="viewer-stat-note">
+                  {sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
+                </span>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Atlas Utilization</span>
+                <strong className="viewer-stat-value">
+                  {sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
+                    ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
+                    : 'Unavailable'}
+                </strong>
+                <span className="viewer-stat-note">
+                  {atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
+                </span>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Texture Memory</span>
+                <strong className="viewer-stat-value">
+                  {sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
+                    ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+            </div>
+            <div className="viewer-animation-summary">
+              <span className="viewer-section-label">Animation Summary</span>
+              <div className="viewer-summary-list">
+                {animationSummaries.length === 0 ? (
+                  <div className="viewer-summary-row viewer-summary-empty">No animation summary available.</div>
+                ) : (
+                  animationSummaries.map((animation) => (
+                    <button
+                      type="button"
+                      key={animation.name}
+                      className={`viewer-summary-row${animation.name === selectedAnimation ? ' viewer-summary-row-active' : ''}`}
+                      onClick={() => updateAnimation(animation.name, loop)}
+                    >
+                      <span className="viewer-summary-name">{animation.name}</span>
+                      <span className="viewer-summary-meta">
+                        {animation.duration.toFixed(2)}s
+                        {' · '}
+                        {Math.round(animation.maxWidth)} x {Math.round(animation.maxHeight)}
+                      </span>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>

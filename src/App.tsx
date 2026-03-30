@@ -11,6 +11,7 @@ type SelectedFiles = {
 
 type LoadedScene = {
   app: Application
+  atlasInfo: AtlasInfo | null
   boundsOverlay: Graphics
   syncSceneMetrics: () => void
   spine: Spine
@@ -32,6 +33,12 @@ type AnimationSizeRange = {
   minHeight: number
   maxWidth: number
   maxHeight: number
+}
+
+type AtlasInfo = {
+  pageHeight: number
+  pageWidth: number
+  scale: number | null
 }
 
 function createAssetUrl(file: File) {
@@ -85,6 +92,32 @@ function getAtlasPageNames(atlasText: string) {
   }
 
   return pages
+}
+
+function parseAtlasInfo(atlasText: string): AtlasInfo | null {
+  const lines = atlasText.split(/\r\n|\r|\n/).map((line) => line.trim())
+  const sizeLine = lines.find((line) => line.toLowerCase().startsWith('size:'))
+
+  if (!sizeLine) {
+    return null
+  }
+
+  const sizeMatch = sizeLine.match(/^size:\s*([0-9.]+)\s*,\s*([0-9.]+)$/i)
+
+  if (!sizeMatch) {
+    return null
+  }
+
+  const scaleLine = lines.find((line) => line.toLowerCase().startsWith('scale:'))
+  const pageWidth = Number(sizeMatch[1])
+  const pageHeight = Number(sizeMatch[2])
+  const scale = scaleLine ? Number(scaleLine.replace(/^scale:\s*/i, '')) : null
+
+  return {
+    pageHeight,
+    pageWidth,
+    scale: Number.isFinite(scale) ? scale : null,
+  }
 }
 
 function classifyFiles(fileList: FileList | File[]) {
@@ -206,6 +239,7 @@ async function loadScene(
 
   try {
     const atlasText = await files.atlas.text()
+    const atlasInfo = parseAtlasInfo(atlasText)
     const atlasPageNames = getAtlasPageNames(atlasText)
     const skeletonUrl = createAssetUrl(files.skeleton)
     const atlasUrl = createAssetUrl(files.atlas)
@@ -289,7 +323,7 @@ async function loadScene(
       onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
     })
 
-    return { app, boundsOverlay, syncSceneMetrics, spine, animations, assetKeys }
+    return { app, atlasInfo, boundsOverlay, syncSceneMetrics, spine, animations, assetKeys }
   } catch (error) {
     app.destroy(true, { children: true })
     throw error
@@ -333,6 +367,7 @@ function App() {
   const [hasScene, setHasScene] = useState(false)
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
   const [animationSizeRange, setAnimationSizeRange] = useState<AnimationSizeRange | null>(null)
+  const [atlasInfo, setAtlasInfo] = useState<AtlasInfo | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const canvasHostRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
@@ -421,6 +456,7 @@ function App() {
     if (previousScene) {
       destroyScene(previousScene)
       sceneRef.current = null
+      setAtlasInfo(null)
       setAnimationSizeRange(null)
       setHasScene(false)
       setFps(null)
@@ -438,6 +474,7 @@ function App() {
 
       scene.spine.state.timeScale = timeScale
       sceneRef.current = scene
+      setAtlasInfo(scene.atlasInfo)
       setAnimationSizeRange(null)
       setHasScene(true)
       setAnimations(scene.animations)
@@ -454,6 +491,7 @@ function App() {
 
       setAnimations([])
       setSelectedAnimation('')
+      setAtlasInfo(null)
       setFps(null)
       setHasScene(false)
       setAnimationSizeRange(null)
@@ -466,6 +504,10 @@ function App() {
   }
 
   const canLoad = Boolean(files.atlas && files.skeleton && files.images.length > 0) && !loading
+  const atlasAdjustedWidth =
+    spineSize && atlasInfo?.scale ? spineSize.realWidth * atlasInfo.scale : null
+  const atlasAdjustedHeight =
+    spineSize && atlasInfo?.scale ? spineSize.realHeight * atlasInfo.scale : null
 
   return (
     <main className="app-shell">
@@ -607,7 +649,7 @@ function App() {
             </div>
             <div className="viewer-metrics">
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Real Size</span>
+                <span className="viewer-stat-label">Skeleton Bounds</span>
                 <strong className="viewer-stat-value">
                   {spineSize
                     ? `${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
@@ -615,10 +657,34 @@ function App() {
                 </strong>
               </div>
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Realtime Size</span>
+                <span className="viewer-stat-label">Rendered Size</span>
                 <strong className="viewer-stat-value">
                   {spineSize
                     ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Atlas Page</span>
+                <strong className="viewer-stat-value">
+                  {atlasInfo
+                    ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Atlas Scale</span>
+                <strong className="viewer-stat-value">
+                  {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined
+                    ? atlasInfo.scale
+                    : 'Unavailable'}
+                </strong>
+              </div>
+              <div className="viewer-stat">
+                <span className="viewer-stat-label">Atlas-Adjusted</span>
+                <strong className="viewer-stat-value">
+                  {atlasAdjustedWidth !== null && atlasAdjustedHeight !== null
+                    ? `${Math.round(atlasAdjustedWidth)} x ${Math.round(atlasAdjustedHeight)} px`
                     : 'Unavailable'}
                 </strong>
               </div>
@@ -631,7 +697,7 @@ function App() {
                 </strong>
               </div>
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Min Real Size</span>
+                <span className="viewer-stat-label">Min Skeleton</span>
                 <strong className="viewer-stat-value">
                   {animationSizeRange
                     ? `${Math.round(animationSizeRange.minWidth)} x ${Math.round(animationSizeRange.minHeight)} px`
@@ -639,7 +705,7 @@ function App() {
                 </strong>
               </div>
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Max Real Size</span>
+                <span className="viewer-stat-label">Max Skeleton</span>
                 <strong className="viewer-stat-value">
                   {animationSizeRange
                     ? `${Math.round(animationSizeRange.maxWidth)} x ${Math.round(animationSizeRange.maxHeight)} px`

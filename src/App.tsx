@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Assets, ImageSource } from 'pixi.js'
+import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8'
 import './App.css'
 
@@ -13,6 +13,7 @@ type LoadedScene = {
   app: Application
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
+  debugBounds: Graphics
   requestedScale: {
     value: number
   }
@@ -313,11 +314,43 @@ function getDisplayedScale(
   return normalizedRequestedScale
 }
 
+function drawAnimationBoundsBorder(
+  debugBounds: Graphics | null,
+  bounds: { x: number; y: number; width: number; height: number },
+  position: { x: number; y: number },
+  scale: number,
+) {
+  if (!debugBounds) {
+    return
+  }
+
+  debugBounds.clear()
+
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return
+  }
+
+  debugBounds
+    .rect(
+      position.x + bounds.x * scale,
+      position.y + bounds.y * scale,
+      bounds.width * scale,
+      bounds.height * scale,
+    )
+    .stroke({
+      alpha: 0.95,
+      color: 0xffc857,
+      pixelLine: true,
+      width: 1.5,
+    })
+}
+
 function updateSpineLayout(
   spine: Spine,
   width: number,
   height: number,
   requestedScale = 1,
+  debugBounds: Graphics | null = null,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
   const normalizedRequestedScale = requestedScale > 0 ? requestedScale : 1
@@ -325,6 +358,7 @@ function updateSpineLayout(
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(normalizedRequestedScale)
+    drawAnimationBoundsBorder(debugBounds, bounds, spine.position, normalizedRequestedScale)
     return {
       canvasHeight: height,
       canvasWidth: width,
@@ -347,6 +381,7 @@ function updateSpineLayout(
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
+  drawAnimationBoundsBorder(debugBounds, bounds, spine.position, scale)
 
   return {
     canvasHeight: height,
@@ -447,9 +482,11 @@ async function loadScene(
       skeleton: skeletonAssetKey,
       ticker: app.ticker,
     })
+    const debugBounds = new Graphics()
     const animationSummaries = computeAnimationSummaries(spine)
     const requestedScaleState = { value: requestedScale }
     let lastFpsUpdate = 0
+
     const syncSceneMetrics = () => {
       onSizeChange?.(
         updateSpineLayout(
@@ -457,6 +494,7 @@ async function loadScene(
           app.screen.width,
           app.screen.height,
           requestedScaleState.value,
+          debugBounds,
         ),
       )
       onPlaybackChange?.(computePlaybackInfo(spine))
@@ -476,12 +514,14 @@ async function loadScene(
     }
 
     app.stage.addChild(spine)
+    app.stage.addChild(debugBounds)
     onSizeChange?.(
       updateSpineLayout(
         spine,
         app.screen.width,
         app.screen.height,
         requestedScaleState.value,
+        debugBounds,
       ),
     )
     onFpsChange?.(Math.round(app.ticker.FPS))
@@ -495,6 +535,7 @@ async function loadScene(
           app.screen.width,
           app.screen.height,
           requestedScaleState.value,
+          debugBounds,
         ),
       )
     })
@@ -504,6 +545,7 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      debugBounds,
       requestedScale: requestedScaleState,
       syncSceneMetrics,
       spine,
@@ -524,6 +566,8 @@ function destroyScene(scene: LoadedScene | null) {
 
   scene.spine.autoUpdate = false
   scene.app.ticker.remove(scene.syncSceneMetrics)
+  scene.app.stage.removeChild(scene.debugBounds)
+  scene.debugBounds.destroy()
   scene.app.stage.removeChild(scene.spine)
   scene.spine.destroy()
   scene.app.destroy(undefined, { children: false })
@@ -623,6 +667,7 @@ function App() {
         scene.app.screen.width,
         scene.app.screen.height,
         userScale,
+        scene.debugBounds,
       ),
     )
     setSelectedAnimation(animationName)
@@ -658,6 +703,7 @@ function App() {
         scene.app.screen.width,
         scene.app.screen.height,
         normalizedScale,
+        scene.debugBounds,
       ),
     )
   }

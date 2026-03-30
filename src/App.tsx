@@ -178,12 +178,39 @@ function drawBoundsOverlay(spine: Spine, boundsOverlay: Graphics | undefined, bo
   return bounds
 }
 
-function updateSpineLayout(spine: Spine, width: number, height: number, boundsOverlay?: Graphics): SpineSize {
+function getDisplayedScale(
+  boundsWidth: number,
+  boundsHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  atlasScale = 1,
+) {
+  const normalizedAtlasScale = atlasScale > 0 ? atlasScale : 1
+
+  if (boundsWidth <= 0 || boundsHeight <= 0) {
+    return normalizedAtlasScale
+  }
+
+  return Math.min(
+    normalizedAtlasScale,
+    canvasWidth / boundsWidth,
+    canvasHeight / boundsHeight,
+  )
+}
+
+function updateSpineLayout(
+  spine: Spine,
+  width: number,
+  height: number,
+  atlasScale = 1,
+  boundsOverlay?: Graphics,
+): SpineSize {
   const bounds = getSpineBounds(spine)
+  const normalizedAtlasScale = atlasScale > 0 ? atlasScale : 1
 
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
-    spine.scale.set(1)
+    spine.scale.set(normalizedAtlasScale)
     boundsOverlay?.clear()
     return {
       canvasHeight: height,
@@ -197,7 +224,7 @@ function updateSpineLayout(spine: Spine, width: number, height: number, boundsOv
 
   const centerX = bounds.x + bounds.width * 0.5
   const centerY = bounds.y + bounds.height * 0.5
-  const scale = Math.min(1, width / bounds.width, height / bounds.height)
+  const scale = getDisplayedScale(bounds.width, bounds.height, width, height, normalizedAtlasScale)
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
@@ -297,7 +324,15 @@ async function loadScene(
     const boundsOverlay = new Graphics()
     let lastFpsUpdate = 0
     const syncSceneMetrics = () => {
-      onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
+      onSizeChange?.(
+        updateSpineLayout(
+          spine,
+          app.screen.width,
+          app.screen.height,
+          atlasInfo?.scale ?? 1,
+          boundsOverlay,
+        ),
+      )
 
       const now = performance.now()
 
@@ -315,12 +350,28 @@ async function loadScene(
 
     app.stage.addChild(spine)
     app.stage.addChild(boundsOverlay)
-    onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
+    onSizeChange?.(
+      updateSpineLayout(
+        spine,
+        app.screen.width,
+        app.screen.height,
+        atlasInfo?.scale ?? 1,
+        boundsOverlay,
+      ),
+    )
     onFpsChange?.(Math.round(app.ticker.FPS))
     app.ticker.add(syncSceneMetrics)
 
     app.renderer.on('resize', () => {
-      onSizeChange?.(updateSpineLayout(spine, app.screen.width, app.screen.height, boundsOverlay))
+      onSizeChange?.(
+        updateSpineLayout(
+          spine,
+          app.screen.width,
+          app.screen.height,
+          atlasInfo?.scale ?? 1,
+          boundsOverlay,
+        ),
+      )
     })
 
     return { app, atlasInfo, boundsOverlay, syncSceneMetrics, spine, animations, assetKeys }
@@ -411,7 +462,13 @@ function App() {
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
     setAnimationSizeRange(null)
     setSpineSize(
-      updateSpineLayout(scene.spine, scene.app.screen.width, scene.app.screen.height, scene.boundsOverlay),
+      updateSpineLayout(
+        scene.spine,
+        scene.app.screen.width,
+        scene.app.screen.height,
+        scene.atlasInfo?.scale ?? 1,
+        scene.boundsOverlay,
+      ),
     )
     setSelectedAnimation(animationName)
   }
@@ -504,10 +561,52 @@ function App() {
   }
 
   const canLoad = Boolean(files.atlas && files.skeleton && files.images.length > 0) && !loading
-  const atlasAdjustedWidth =
-    spineSize && atlasInfo?.scale ? spineSize.realWidth * atlasInfo.scale : null
-  const atlasAdjustedHeight =
-    spineSize && atlasInfo?.scale ? spineSize.realHeight * atlasInfo.scale : null
+  const minSkeletonScaled =
+    animationSizeRange && spineSize
+      ? {
+          height:
+            animationSizeRange.minHeight *
+            getDisplayedScale(
+              animationSizeRange.minWidth,
+              animationSizeRange.minHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo?.scale ?? 1,
+            ),
+          width:
+            animationSizeRange.minWidth *
+            getDisplayedScale(
+              animationSizeRange.minWidth,
+              animationSizeRange.minHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo?.scale ?? 1,
+            ),
+        }
+      : null
+  const maxSkeletonScaled =
+    animationSizeRange && spineSize
+      ? {
+          height:
+            animationSizeRange.maxHeight *
+            getDisplayedScale(
+              animationSizeRange.maxWidth,
+              animationSizeRange.maxHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo?.scale ?? 1,
+            ),
+          width:
+            animationSizeRange.maxWidth *
+            getDisplayedScale(
+              animationSizeRange.maxWidth,
+              animationSizeRange.maxHeight,
+              spineSize.canvasWidth,
+              spineSize.canvasHeight,
+              atlasInfo?.scale ?? 1,
+            ),
+        }
+      : null
 
   return (
     <main className="app-shell">
@@ -681,28 +780,17 @@ function App() {
                 </strong>
               </div>
               <div className="viewer-stat">
-                <span className="viewer-stat-label">Atlas-Adjusted</span>
-                <strong className="viewer-stat-value">
-                  {atlasAdjustedWidth !== null && atlasAdjustedHeight !== null
-                    ? `${Math.round(atlasAdjustedWidth)} x ${Math.round(atlasAdjustedHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Canvas Size</span>
-                <strong className="viewer-stat-value">
-                  {spineSize
-                    ? `${Math.round(spineSize.canvasWidth)} x ${Math.round(spineSize.canvasHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
                 <span className="viewer-stat-label">Min Skeleton</span>
                 <strong className="viewer-stat-value">
                   {animationSizeRange
                     ? `${Math.round(animationSizeRange.minWidth)} x ${Math.round(animationSizeRange.minHeight)} px`
                     : 'Unavailable'}
                 </strong>
+                <span className="viewer-stat-note">
+                  {minSkeletonScaled
+                    ? `Scaled ${Math.round(minSkeletonScaled.width)} x ${Math.round(minSkeletonScaled.height)} px`
+                    : 'Scaled unavailable'}
+                </span>
               </div>
               <div className="viewer-stat">
                 <span className="viewer-stat-label">Max Skeleton</span>
@@ -711,6 +799,11 @@ function App() {
                     ? `${Math.round(animationSizeRange.maxWidth)} x ${Math.round(animationSizeRange.maxHeight)} px`
                     : 'Unavailable'}
                 </strong>
+                <span className="viewer-stat-note">
+                  {maxSkeletonScaled
+                    ? `Scaled ${Math.round(maxSkeletonScaled.width)} x ${Math.round(maxSkeletonScaled.height)} px`
+                    : 'Scaled unavailable'}
+                </span>
               </div>
               <div className="viewer-stat viewer-stat-fps">
                 <span className="viewer-stat-label">FPS</span>

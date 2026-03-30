@@ -227,6 +227,13 @@
   overflow-wrap: anywhere;
 }
 
+.viewer-stat-note {
+  color: #86a0b6;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
 .viewer-stat-fps {
   background:
     linear-gradient(180deg, rgba(37, 30, 8, 0.95), rgba(17, 14, 6, 0.92)),

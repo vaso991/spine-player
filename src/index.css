@@ -1,0 +1,72 @@
+:root {
+  --text: #bfd1df;
+  --text-h: #f5fbff;
+  --bg: #050b15;
+  --border: rgba(188, 207, 224, 0.18);
+  --code-bg: rgba(127, 255, 212, 0.12);
+  --sans: 'Satoshi', 'Avenir Next', 'Segoe UI', sans-serif;
+  --heading: 'Clash Display', 'Avenir Next Condensed', 'Segoe UI', sans-serif;
+  --mono: 'SFMono-Regular', 'SF Mono', Consolas, monospace;
+  font: 17px/1.5 var(--sans);
+  letter-spacing: 0.01em;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(57, 114, 255, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(127, 255, 212, 0.08), transparent 20%),
+    linear-gradient(180deg, #08111d, #050b15 58%, #03070d);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  min-height: 100svh;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: clamp(2rem, 3.8vw, 3.4rem);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 1.4rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 8px;
+  color: #eafff8;
+}
+
+code {
+  font-size: 0.92em;
+  line-height: 1.35;
+  padding: 3px 8px;
+  background: var(--code-bg);
+}

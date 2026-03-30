@@ -16,6 +16,13 @@ type LoadedScene = {
   assetKeys: string[]
 }
 
+type SpineSize = {
+  canvasWidth: number
+  canvasHeight: number
+  realWidth: number
+  realHeight: number
+}
+
 const VIEWPORT_PADDING = 0.82
 
 function createAssetUrl(file: File) {
@@ -97,13 +104,18 @@ function classifyFiles(fileList: FileList | File[]) {
   return { atlas, skeleton, images }
 }
 
-function fitSpineToViewport(spine: Spine, width: number, height: number) {
+function fitSpineToViewport(spine: Spine, width: number, height: number): SpineSize {
   const bounds = new SetupPoseBoundsProvider(true).calculateBounds(spine)
 
   if (bounds.width <= 0 || bounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(1)
-    return
+    return {
+      canvasHeight: height,
+      canvasWidth: width,
+      realHeight: 0,
+      realWidth: 0,
+    }
   }
 
   const scale = Math.min(width / bounds.width, height / bounds.height) * VIEWPORT_PADDING
@@ -112,11 +124,19 @@ function fitSpineToViewport(spine: Spine, width: number, height: number) {
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
+
+  return {
+    canvasHeight: height,
+    canvasWidth: width,
+    realHeight: bounds.height,
+    realWidth: bounds.width,
+  }
 }
 
 async function loadScene(
   files: SelectedFiles,
   host: HTMLDivElement,
+  onSizeChange?: (size: SpineSize) => void,
 ): Promise<LoadedScene> {
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
     throw new Error('Select an .atlas, a .skel skeleton, and at least one .png image.')
@@ -199,10 +219,10 @@ async function loadScene(
     }
 
     app.stage.addChild(spine)
-    fitSpineToViewport(spine, app.screen.width, app.screen.height)
+    onSizeChange?.(fitSpineToViewport(spine, app.screen.width, app.screen.height))
 
     app.renderer.on('resize', () => {
-      fitSpineToViewport(spine, app.screen.width, app.screen.height)
+      onSizeChange?.(fitSpineToViewport(spine, app.screen.width, app.screen.height))
     })
 
     return { app, spine, animations, assetKeys }
@@ -242,6 +262,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('Upload Spine files and press Load demo.')
+  const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
 
@@ -260,6 +281,7 @@ function App() {
     }
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
+    setSpineSize(fitSpineToViewport(scene.spine, scene.app.screen.width, scene.app.screen.height))
     setSelectedAnimation(animationName)
   }
 
@@ -306,7 +328,7 @@ function App() {
     }
 
     try {
-      const scene = await loadScene(files, viewportRef.current)
+      const scene = await loadScene(files, viewportRef.current, setSpineSize)
       const firstAnimation = scene.animations[0] ?? ''
 
       scene.spine.state.timeScale = timeScale
@@ -325,6 +347,7 @@ function App() {
 
       setAnimations([])
       setSelectedAnimation('')
+      setSpineSize(null)
       setError(message)
       setStatus('Load failed.')
     } finally {
@@ -468,8 +491,17 @@ function App() {
 
         <div className="viewer-panel">
           <div className="viewer-chrome">
-            <span>canvas</span>
             <span>{selectedAnimation || 'idle'}</span>
+            <span className="viewer-size">
+              {spineSize
+                ? `Real size ${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
+                : 'Real size unavailable'}
+            </span>
+            <span className="viewer-size">
+              {spineSize
+                ? `Canvas size ${Math.round(spineSize.canvasWidth)} x ${Math.round(spineSize.canvasHeight)} px`
+                : 'Canvas size unavailable'}
+            </span>
           </div>
           <div ref={viewportRef} className="viewer-stage">
             <div className="viewer-placeholder">

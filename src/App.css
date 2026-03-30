@@ -157,14 +157,19 @@
 
 .viewer-chrome {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
   padding: 14px 18px;
   border-bottom: 1px solid rgba(188, 207, 224, 0.14);
   color: #a9bdd2;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.78rem;
+}
+
+.viewer-size {
+  color: #d7e8f8;
 }
 
 .viewer-stage {

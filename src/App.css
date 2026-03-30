@@ -195,6 +195,11 @@
   gap: 10px;
 }
 
+.viewer-metric-group {
+  display: grid;
+  gap: 10px;
+}
+
 .viewer-stat {
   display: flex;
   flex-direction: column;

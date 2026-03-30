@@ -1052,170 +1052,188 @@ function App() {
 
         <div className="viewer-panel">
           <div className="viewer-chrome">
-            <div className="viewer-metrics">
-              <div className="viewer-stat viewer-stat-primary">
-                <span className="viewer-stat-label">Active Animation</span>
-                <strong className="viewer-stat-value">{selectedAnimation || 'idle'}</strong>
+            <div className="viewer-metric-group">
+              <span className="viewer-section-label">Realtime</span>
+              <div className="viewer-metrics">
+                <div className="viewer-stat viewer-stat-primary">
+                  <span className="viewer-stat-label">Active Animation</span>
+                  <strong className="viewer-stat-value">{selectedAnimation || 'idle'}</strong>
+                </div>
+                <div className="viewer-stat viewer-stat-fps">
+                  <span className="viewer-stat-label">FPS</span>
+                  <strong className="viewer-stat-value">{fps === null ? 'Unavailable' : fps}</strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Current Time</span>
+                  <strong className="viewer-stat-value">
+                    {playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Animation Duration</span>
+                  <strong className="viewer-stat-value">
+                    {playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Rendered Size</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize
+                      ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {renderedSizeRange
+                      ? `Low ${Math.round(renderedSizeRange.minWidth)} x ${Math.round(renderedSizeRange.minHeight)} px · Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
+                      : 'Range unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Current Scale</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Display Offset</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize
+                      ? `${Math.round(spineSize.displayOffsetX)}, ${Math.round(spineSize.displayOffsetY)}`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
               </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Skeleton Bounds</span>
-                <strong className="viewer-stat-value">
-                  {spineSize
-                    ? `${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
-                    : 'Unavailable'}
-                </strong>
+            </div>
+            <div className="viewer-metric-group">
+              <span className="viewer-section-label">Skeleton</span>
+              <div className="viewer-metrics">
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Skeleton Bounds</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize
+                      ? `${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Min Skeleton</span>
+                  <strong className="viewer-stat-value">
+                    {selectedAnimationSummary
+                      ? `${Math.round(selectedAnimationSummary.minWidth)} x ${Math.round(selectedAnimationSummary.minHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {minSkeletonScaled
+                      ? `Scaled ${Math.round(minSkeletonScaled.width)} x ${Math.round(minSkeletonScaled.height)} px`
+                      : 'Scaled unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Max Skeleton</span>
+                  <strong className="viewer-stat-value">
+                    {selectedAnimationSummary
+                      ? `${Math.round(selectedAnimationSummary.maxWidth)} x ${Math.round(selectedAnimationSummary.maxHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {maxSkeletonScaled
+                      ? `Scaled ${Math.round(maxSkeletonScaled.width)} x ${Math.round(maxSkeletonScaled.height)} px`
+                      : 'Scaled unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Bounds Aspect</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize && spineSize.realHeight > 0
+                      ? (spineSize.realWidth / spineSize.realHeight).toFixed(3)
+                      : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Bounds Origin</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize
+                      ? `${Math.round(spineSize.originX)}, ${Math.round(spineSize.originY)}`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Safe Web Size</span>
+                  <strong className="viewer-stat-value">
+                    {safeContainerSize
+                      ? `${Math.round(safeContainerSize.width)} x ${Math.round(safeContainerSize.height)} px`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
               </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Rendered Size</span>
-                <strong className="viewer-stat-value">
-                  {spineSize
-                    ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {renderedSizeRange
-                    ? `Low ${Math.round(renderedSizeRange.minWidth)} x ${Math.round(renderedSizeRange.minHeight)} px · Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
-                    : 'Range unavailable'}
-                </span>
+            </div>
+            <div className="viewer-metric-group">
+              <span className="viewer-section-label">Atlas</span>
+              <div className="viewer-metrics">
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Atlas Page</span>
+                  <strong className="viewer-stat-value">
+                    {atlasInfo
+                      ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Atlas Scale</span>
+                  <strong className="viewer-stat-value">
+                    {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined
+                      ? atlasInfo.scale
+                      : 'Unavailable'}
+                  </strong>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Atlas Utilization</span>
+                  <strong className="viewer-stat-value">
+                    {sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
+                      ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
+                      : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Texture Memory</span>
+                  <strong className="viewer-stat-value">
+                    {sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
+                      ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
+                      : 'Unavailable'}
+                  </strong>
+                </div>
               </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Atlas Page</span>
-                <strong className="viewer-stat-value">
-                  {atlasInfo
-                    ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Atlas Scale</span>
-                <strong className="viewer-stat-value">
-                  {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined
-                    ? atlasInfo.scale
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Min Skeleton</span>
-                <strong className="viewer-stat-value">
-                  {selectedAnimationSummary
-                    ? `${Math.round(selectedAnimationSummary.minWidth)} x ${Math.round(selectedAnimationSummary.minHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {minSkeletonScaled
-                    ? `Scaled ${Math.round(minSkeletonScaled.width)} x ${Math.round(minSkeletonScaled.height)} px`
-                    : 'Scaled unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Max Skeleton</span>
-                <strong className="viewer-stat-value">
-                  {selectedAnimationSummary
-                    ? `${Math.round(selectedAnimationSummary.maxWidth)} x ${Math.round(selectedAnimationSummary.maxHeight)} px`
-                    : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {maxSkeletonScaled
-                    ? `Scaled ${Math.round(maxSkeletonScaled.width)} x ${Math.round(maxSkeletonScaled.height)} px`
-                    : 'Scaled unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat viewer-stat-fps">
-                <span className="viewer-stat-label">FPS</span>
-                <strong className="viewer-stat-value">{fps === null ? 'Unavailable' : fps}</strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Current Scale</span>
-                <strong className="viewer-stat-value">
-                  {spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Current Time</span>
-                <strong className="viewer-stat-value">
-                  {playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Animation Duration</span>
-                <strong className="viewer-stat-value">
-                  {playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Bounds Aspect</span>
-                <strong className="viewer-stat-value">
-                  {spineSize && spineSize.realHeight > 0
-                    ? (spineSize.realWidth / spineSize.realHeight).toFixed(3)
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Bounds Origin</span>
-                <strong className="viewer-stat-value">
-                  {spineSize
-                    ? `${Math.round(spineSize.originX)}, ${Math.round(spineSize.originY)}`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Display Offset</span>
-                <strong className="viewer-stat-value">
-                  {spineSize
-                    ? `${Math.round(spineSize.displayOffsetX)}, ${Math.round(spineSize.displayOffsetY)}`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Safe Web Size</span>
-                <strong className="viewer-stat-value">
-                  {safeContainerSize
-                    ? `${Math.round(safeContainerSize.width)} x ${Math.round(safeContainerSize.height)} px`
-                    : 'Unavailable'}
-                </strong>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Bones / Slots</span>
-                <strong className="viewer-stat-value">
-                  {sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Attachments / Events</span>
-                <strong className="viewer-stat-value">
-                  {sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Atlas Utilization</span>
-                <strong className="viewer-stat-value">
-                  {sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
-                    ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
-                    : 'Unavailable'}
-                </strong>
-                <span className="viewer-stat-note">
-                  {atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
-                </span>
-              </div>
-              <div className="viewer-stat">
-                <span className="viewer-stat-label">Texture Memory</span>
-                <strong className="viewer-stat-value">
-                  {sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
-                    ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
-                    : 'Unavailable'}
-                </strong>
+            </div>
+            <div className="viewer-metric-group">
+              <span className="viewer-section-label">Rig</span>
+              <div className="viewer-metrics">
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Bones / Slots</span>
+                  <strong className="viewer-stat-value">
+                    {sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Attachments / Events</span>
+                  <strong className="viewer-stat-value">
+                    {sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="viewer-animation-summary">

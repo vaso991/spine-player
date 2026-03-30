@@ -71,6 +71,32 @@ function getAtlasPageNames(atlasText: string) {
   return pages
 }
 
+function classifyFiles(fileList: FileList | File[]) {
+  let atlas: File | null = null
+  let skeleton: File | null = null
+  const images: File[] = []
+
+  for (const file of Array.from(fileList)) {
+    const lowerName = file.name.toLowerCase()
+
+    if (lowerName.endsWith('.atlas')) {
+      atlas = file
+      continue
+    }
+
+    if (lowerName.endsWith('.skel')) {
+      skeleton = file
+      continue
+    }
+
+    if (lowerName.endsWith('.png')) {
+      images.push(file)
+    }
+  }
+
+  return { atlas, skeleton, images }
+}
+
 function fitSpineToViewport(spine: Spine, width: number, height: number) {
   const bounds = new SetupPoseBoundsProvider(true).calculateBounds(spine)
 
@@ -249,6 +275,20 @@ function App() {
     scene.spine.state.timeScale = nextTimeScale
   }
 
+  function applyCombinedFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) {
+      return
+    }
+
+    const nextFiles = classifyFiles(fileList)
+
+    setFiles((current) => ({
+      atlas: nextFiles.atlas ?? current.atlas,
+      skeleton: nextFiles.skeleton ?? current.skeleton,
+      images: nextFiles.images.length > 0 ? nextFiles.images : current.images,
+    }))
+  }
+
   async function handleLoad() {
     if (!viewportRef.current) {
       return
@@ -298,6 +338,17 @@ function App() {
     <main className="app-shell">
       <section className="workspace">
         <aside className="controls">
+          <label className="field">
+            <span>All Spine files</span>
+            <input
+              type="file"
+              accept=".atlas,.skel,.png,text/plain,application/octet-stream,image/png"
+              multiple
+              onChange={(event) => applyCombinedFiles(event.target.files)}
+            />
+            <small>Select the full set at once. The picker will detect `.atlas`, `.skel`, and `.png` files automatically.</small>
+          </label>
+
           <label className="field">
             <span>Atlas file</span>
             <input

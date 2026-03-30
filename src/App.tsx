@@ -146,13 +146,11 @@ async function loadScene(
     await Assets.load([
       {
         alias: skeletonAssetKey,
-        loadParser: 'spineSkeletonLoader',
         parser: 'spineSkeletonLoader',
         src: skeletonUrl,
       },
       {
         alias: atlasAssetKey,
-        loadParser: 'spineTextureAtlasLoader',
         parser: 'spineTextureAtlasLoader',
         src: atlasUrl,
         data: {
@@ -195,7 +193,10 @@ function destroyScene(scene: LoadedScene | null) {
     return
   }
 
-  scene.app.destroy(true, { children: true })
+  scene.spine.autoUpdate = false
+  scene.app.stage.removeChild(scene.spine)
+  scene.spine.destroy()
+  scene.app.destroy(undefined, { children: false })
 
   for (const assetKey of scene.assetKeys) {
     void Assets.unload(assetKey)

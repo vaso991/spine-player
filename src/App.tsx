@@ -839,6 +839,7 @@ function destroyScene(scene: LoadedScene | null) {
 }
 
 function App() {
+  const assetBaseUrl = import.meta.env.BASE_URL
   const [files, setFiles] = useState<SelectedFiles>({
     atlas: null,
     skeleton: null,
@@ -1534,7 +1535,7 @@ function App() {
         <footer className="pb-2 text-center text-xs tracking-[0.24em] text-muted-foreground">
           {!showWorkspace ? (
             <img
-              src="/powered-by.png"
+              src={`${assetBaseUrl}powered-by.png`}
               alt="Powered by"
               className="mx-auto mb-4 h-auto w-auto max-w-[220px]"
             />

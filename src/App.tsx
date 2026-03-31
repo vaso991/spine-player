@@ -4,6 +4,7 @@ import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8'
 import {
   Activity,
+  ArrowLeft,
   Boxes,
   Clapperboard,
   Image as ImageIcon,
@@ -955,6 +956,29 @@ function App() {
     )
   }
 
+  function handleBackToIntake() {
+    const scene = sceneRef.current
+
+    if (scene) {
+      destroyScene(scene)
+      sceneRef.current = null
+    }
+
+    setAnimations([])
+    setAnimationSummaries([])
+    setAtlasInfo(null)
+    setFps(null)
+    setHasScene(false)
+    setPlaybackInfo(null)
+    setRenderedSizeRange(null)
+    setSceneInfo(null)
+    setSelectedAnimation('')
+    setShowWorkspace(false)
+    setSpineSize(null)
+    setStatus('Upload Spine files and press Load demo.')
+    setUserScale(DEFAULT_USER_SCALE)
+  }
+
   function applyCombinedFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) {
       return
@@ -1124,7 +1148,7 @@ function App() {
   const defaultScale = atlasInfo?.scale ?? DEFAULT_USER_SCALE
 
   return (
-    <main className="relative min-h-svh overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+    <main className="relative min-h-svh px-4 py-6 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.14),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(34,197,94,0.12),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_26%)]" />
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -1216,7 +1240,7 @@ function App() {
           </section>
         ) : (
           <section className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
-            <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            <div className="space-y-6 xl:sticky xl:top-[20px] xl:self-start">
               <SectionCard
                 icon={PackageOpen}
                 title="Pixi Stage"
@@ -1243,6 +1267,15 @@ function App() {
             </div>
 
             <aside className="space-y-6">
+              <Button
+                variant="outline"
+                className="h-11 w-full rounded-2xl"
+                onClick={handleBackToIntake}
+              >
+                <ArrowLeft className="size-4" />
+                Back to File Selection
+              </Button>
+
               <SectionCard
                 icon={Clapperboard}
                 title="Playback Controls"
@@ -1499,7 +1532,13 @@ function App() {
         )}
 
         <footer className="pb-2 text-center text-xs tracking-[0.24em] text-muted-foreground">
-          With ❤️ from BEON
+          {!showWorkspace ? (
+            <img
+              src="/powered-by.png"
+              alt="Powered by"
+              className="mx-auto mb-4 h-auto w-auto max-w-[220px]"
+            />
+          ) : null}
         </footer>
       </div>
     </main>

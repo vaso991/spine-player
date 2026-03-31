@@ -1391,7 +1391,7 @@ function App() {
         </div>
       </section>
 
-      <footer className="app-footer">With love from BEON</footer>
+      <footer className="app-footer">With ❤️ from BEON</footer>
     </main>
   )
 }

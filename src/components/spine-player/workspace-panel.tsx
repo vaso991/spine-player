@@ -21,10 +21,12 @@ import { Input } from '../ui/input'
 import { Slider } from '../ui/slider'
 import { cn } from '../../lib/utils'
 import { CodePreviewDialog } from './code-preview-dialog'
+import { PixiStage } from './pixi-stage'
 import { MetricCard, SectionCard, formatPixels, formatPoint } from './shared'
 import type {
   AnimationSummary,
   AtlasInfo,
+  LoadedScene,
   PlaybackInfo,
   RenderedSizeRange,
   SceneInfo,
@@ -34,7 +36,8 @@ import type {
 
 export function WorkspacePanel({
   viewportRef,
-  canvasHostRef,
+  scene,
+  onPixiAppInit,
   hasScene,
   loop,
   selectedAnimation,
@@ -69,7 +72,8 @@ export function WorkspacePanel({
   onAnimationSelect,
 }: {
   viewportRef: RefObject<HTMLDivElement | null>
-  canvasHostRef: RefObject<HTMLDivElement | null>
+  scene: LoadedScene | null
+  onPixiAppInit: (app: LoadedScene['app']) => void
   hasScene: boolean
   loop: boolean
   selectedAnimation: string
@@ -135,7 +139,7 @@ export function WorkspacePanel({
               stageBackgroundClass,
             )}
           >
-            <div ref={canvasHostRef} className="h-full w-full" />
+            <PixiStage viewportRef={viewportRef} scene={scene} onAppInit={onPixiAppInit} />
             {!hasScene ? (
               <div className="absolute inset-0 grid place-items-center p-6">
                 <div className="max-w-sm rounded-[24px] border border-border/60 bg-background/45 px-6 py-8 text-center backdrop-blur">

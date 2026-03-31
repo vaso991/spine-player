@@ -29,6 +29,7 @@ export type LoadedScene = {
   }
   debugAnchor: Graphics
   debugBounds: Graphics
+  handleResize: () => void
   getAnimationLayoutBounds: (
     animationName: string,
   ) => { x: number; y: number; width: number; height: number } | null

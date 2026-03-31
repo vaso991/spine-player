@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
+import { Assets, Graphics, ImageSource, type Application } from 'pixi.js'
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8'
 import { IntakePanel } from './components/spine-player/intake-panel'
 import { WorkspacePanel } from './components/spine-player/workspace-panel'
@@ -435,8 +435,7 @@ function updateSpineLayout(
 
 async function loadScene(
   files: SelectedFiles,
-  host: HTMLDivElement,
-  canvasHost: HTMLDivElement,
+  app: Application,
   requestedScale = DEFAULT_USER_SCALE,
   onSizeChange?: (size: SpineSize) => void,
   onFpsChange?: (fps: number) => void,
@@ -445,16 +444,6 @@ async function loadScene(
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
     throw new Error('Select an .atlas, a .skel skeleton, and at least one .png image.')
   }
-
-  const app = new Application()
-
-  await app.init({
-    antialias: true,
-    backgroundAlpha: 0,
-    resizeTo: host,
-  })
-
-  canvasHost.replaceChildren(app.canvas)
 
   const tempUrls: string[] = []
   const assetKeys: string[] = []
@@ -568,9 +557,6 @@ async function loadScene(
       spine.state.setAnimation(0, animations[0], true)
     }
 
-    app.stage.addChild(spine)
-    app.stage.addChild(debugBounds)
-    app.stage.addChild(debugAnchor)
     onSizeChange?.(
       updateSpineLayout(
         spine,
@@ -587,7 +573,7 @@ async function loadScene(
     onPlaybackChange?.(computePlaybackInfo(spine))
     app.ticker.add(syncSceneMetrics)
 
-    app.renderer.on('resize', () => {
+    const handleResize = () => {
       onSizeChange?.(
         updateSpineLayout(
           spine,
@@ -600,7 +586,9 @@ async function loadScene(
           getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
         ),
       )
-    })
+    }
+
+    app.renderer.on('resize', handleResize)
 
     return {
       app,
@@ -610,6 +598,7 @@ async function loadScene(
       debugEnabled: debugEnabledState,
       debugAnchor,
       debugBounds,
+      handleResize,
       getAnimationLayoutBounds,
       requestedScale: requestedScaleState,
       syncSceneMetrics,
@@ -617,7 +606,10 @@ async function loadScene(
       animations,
     }
   } catch (error) {
-    app.destroy(true, { children: true })
+    for (const assetKey of assetKeys) {
+      void Assets.unload(assetKey)
+    }
+
     throw error
   } finally {
     revokeAssetUrls(tempUrls)
@@ -631,13 +623,13 @@ function destroyScene(scene: LoadedScene | null) {
 
   scene.spine.autoUpdate = false
   scene.app.ticker.remove(scene.syncSceneMetrics)
-  scene.app.stage.removeChild(scene.debugAnchor)
+  scene.app.renderer.off('resize', scene.handleResize)
+  scene.debugAnchor.parent?.removeChild(scene.debugAnchor)
   scene.debugAnchor.destroy()
-  scene.app.stage.removeChild(scene.debugBounds)
+  scene.debugBounds.parent?.removeChild(scene.debugBounds)
   scene.debugBounds.destroy()
-  scene.app.stage.removeChild(scene.spine)
+  scene.spine.parent?.removeChild(scene.spine)
   scene.spine.destroy()
-  scene.app.destroy(undefined, { children: false })
 
   for (const assetKey of scene.assetKeys) {
     void Assets.unload(assetKey)
@@ -672,7 +664,7 @@ function App() {
   const [renderedSizeRange, setRenderedSizeRange] = useState<RenderedSizeRange | null>(null)
   const [sceneInfo, setSceneInfo] = useState<SceneInfo | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
-  const canvasHostRef = useRef<HTMLDivElement | null>(null)
+  const pixiAppRef = useRef<Application | null>(null)
   const sceneRef = useRef<LoadedScene | null>(null)
 
   useEffect(() => {
@@ -703,6 +695,20 @@ function App() {
           },
     )
   }, [spineSize])
+
+  async function waitForPixiApp(maxFrames = 12) {
+    for (let frame = 0; frame < maxFrames; frame += 1) {
+      if (pixiAppRef.current) {
+        return pixiAppRef.current
+      }
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+    }
+
+    return null
+  }
 
   function updateAnimation(animationName: string, shouldLoop: boolean) {
     const scene = sceneRef.current
@@ -936,7 +942,9 @@ function App() {
 
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
 
-    if (!viewportRef.current || !canvasHostRef.current) {
+    const app = await waitForPixiApp()
+
+    if (!viewportRef.current || !app) {
       setError('Unable to prepare the Pixi stage.')
       setStatus('Load failed.')
       return
@@ -966,8 +974,7 @@ function App() {
     try {
       const scene = await loadScene(
         files,
-        viewportRef.current,
-        canvasHostRef.current,
+        app,
         files.atlas ? parseAtlasInfo(await files.atlas.text())?.scale ?? DEFAULT_USER_SCALE : DEFAULT_USER_SCALE,
         setSpineSize,
         setFps,
@@ -1126,7 +1133,10 @@ function App() {
         ) : (
           <WorkspacePanel
             viewportRef={viewportRef}
-            canvasHostRef={canvasHostRef}
+            scene={sceneRef.current}
+            onPixiAppInit={(app) => {
+              pixiAppRef.current = app
+            }}
             hasScene={hasScene}
             loop={loop}
             selectedAnimation={selectedAnimation}

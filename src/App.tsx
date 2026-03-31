@@ -12,6 +12,7 @@ import type {
   SceneInfo,
   SelectedFiles,
   SpineSize,
+  StageBackgroundMode,
 } from './components/spine-player/types'
 
 const DEFAULT_USER_SCALE = 1
@@ -449,7 +450,7 @@ async function loadScene(
 
   await app.init({
     antialias: true,
-    background: '#09111f',
+    backgroundAlpha: 0,
     resizeTo: host,
   })
 
@@ -654,8 +655,10 @@ function App() {
   const [selectedAnimation, setSelectedAnimation] = useState('')
   const [loop, setLoop] = useState(true)
   const [showDebugGuides, setShowDebugGuides] = useState(true)
+  const [isPaused, setIsPaused] = useState(false)
   const [userScale, setUserScale] = useState(DEFAULT_USER_SCALE)
   const [timeScale, setTimeScale] = useState(1)
+  const [stageBackgroundMode, setStageBackgroundMode] = useState<StageBackgroundMode>('checkerboard')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('Upload Spine files and press Load demo.')
@@ -709,6 +712,7 @@ function App() {
     }
 
     scene.spine.state.setAnimation(0, animationName, shouldLoop)
+    scene.spine.state.timeScale = isPaused ? 0 : timeScale
     setPlaybackInfo(null)
     setRenderedSizeRange(null)
     const nextSpineSize = updateSpineLayout(
@@ -736,7 +740,72 @@ function App() {
       return
     }
 
-    scene.spine.state.timeScale = nextTimeScale
+    scene.spine.state.timeScale = isPaused ? 0 : nextTimeScale
+  }
+
+  function togglePause() {
+    const scene = sceneRef.current
+    const nextPaused = !isPaused
+
+    setIsPaused(nextPaused)
+
+    if (!scene) {
+      return
+    }
+
+    scene.spine.state.timeScale = nextPaused ? 0 : timeScale
+    scene.syncSceneMetrics()
+  }
+
+  function restartAnimation() {
+    const scene = sceneRef.current
+
+    if (!scene || !selectedAnimation) {
+      return
+    }
+
+    scene.spine.state.setAnimation(0, selectedAnimation, loop)
+    scene.spine.state.timeScale = isPaused ? 0 : timeScale
+    setRenderedSizeRange(null)
+    scene.syncSceneMetrics()
+    setPlaybackInfo(computePlaybackInfo(scene.spine))
+  }
+
+  function stepFrame(direction: -1 | 1) {
+    const scene = sceneRef.current
+
+    if (!scene) {
+      return
+    }
+
+    const entry = scene.spine.state.getCurrent(0)
+
+    if (!entry || !entry.animation) {
+      return
+    }
+
+    const fpsStep = sceneInfo?.dopesheetFps && sceneInfo.dopesheetFps > 0 ? sceneInfo.dopesheetFps : 60
+    const frameDelta = 1 / fpsStep
+    const duration = Math.max(entry.animationEnd - entry.animationStart, entry.animation.duration, 0)
+    let nextTrackTime = entry.trackTime + direction * frameDelta
+
+    if (duration > 0) {
+      if (entry.loop) {
+        nextTrackTime = ((nextTrackTime % duration) + duration) % duration
+      } else {
+        nextTrackTime = Math.min(duration, Math.max(0, nextTrackTime))
+      }
+    } else {
+      nextTrackTime = Math.max(0, nextTrackTime)
+    }
+
+    setIsPaused(true)
+    scene.spine.state.timeScale = 0
+    entry.trackTime = nextTrackTime
+    scene.spine.state.apply(scene.spine.skeleton)
+    scene.spine.skeleton.updateWorldTransform(Physics.update)
+    scene.syncSceneMetrics()
+    setPlaybackInfo(computePlaybackInfo(scene.spine))
   }
 
   function updateUserScale(nextScale: number) {
@@ -811,6 +880,7 @@ function App() {
     setSpineSize(null)
     setStatus('Upload Spine files and press Load demo.')
     setShowDebugGuides(true)
+    setIsPaused(false)
     setUserScale(DEFAULT_USER_SCALE)
   }
 
@@ -861,6 +931,7 @@ function App() {
       setRenderedSizeRange(null)
       setSceneInfo(null)
       setShowDebugGuides(true)
+      setIsPaused(false)
       setUserScale(DEFAULT_USER_SCALE)
     }
 
@@ -908,6 +979,7 @@ function App() {
         textureMemoryBytes: scene.atlasInfo?.textureMemoryBytes ?? null,
       })
       setLoop(true)
+      setIsPaused(false)
       setShowDebugGuides(true)
       setStatus(
         scene.animations.length > 0
@@ -928,6 +1000,7 @@ function App() {
       setRenderedSizeRange(null)
       setSceneInfo(null)
       setShowDebugGuides(true)
+      setIsPaused(false)
       setSpineSize(null)
       setUserScale(DEFAULT_USER_SCALE)
       setError(message)
@@ -1030,9 +1103,11 @@ function App() {
             loop={loop}
             selectedAnimation={selectedAnimation}
             showDebugGuides={showDebugGuides}
+            isPaused={isPaused}
             timeScale={timeScale}
             userScale={userScale}
             defaultScale={defaultScale}
+            stageBackgroundMode={stageBackgroundMode}
             atlasInfo={atlasInfo}
             animationSummaries={animationSummaries}
             animations={animations}
@@ -1051,8 +1126,12 @@ function App() {
               updateAnimation(selectedAnimation, nextLoop)
             }}
             onDebugGuidesChange={updateDebugGuides}
+            onPauseToggle={togglePause}
+            onRestart={restartAnimation}
+            onStepFrame={stepFrame}
             onTimeScaleChange={updateTimeScale}
             onUserScaleChange={updateUserScale}
+            onStageBackgroundModeChange={setStageBackgroundMode}
             onAnimationSelect={(animationName) => updateAnimation(animationName, loop)}
           />
         )}

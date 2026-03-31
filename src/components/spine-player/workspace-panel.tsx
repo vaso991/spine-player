@@ -6,11 +6,16 @@ import {
   Clapperboard,
   Image as ImageIcon,
   Layers3,
+  Pause,
+  Play,
   PackageOpen,
+  SkipBack,
+  SkipForward,
   TimerReset,
 } from 'lucide-react'
 
 import { Button } from '../ui/button'
+import { ButtonGroup } from '../ui/button-group'
 import { Input } from '../ui/input'
 import { Slider } from '../ui/slider'
 import { cn } from '../../lib/utils'
@@ -22,6 +27,7 @@ import type {
   RenderedSizeRange,
   SceneInfo,
   SpineSize,
+  StageBackgroundMode,
 } from './types'
 
 export function WorkspacePanel({
@@ -31,9 +37,11 @@ export function WorkspacePanel({
   loop,
   selectedAnimation,
   showDebugGuides,
+  isPaused,
   timeScale,
   userScale,
   defaultScale,
+  stageBackgroundMode,
   atlasInfo,
   animationSummaries,
   animations,
@@ -49,8 +57,12 @@ export function WorkspacePanel({
   onBack,
   onLoopChange,
   onDebugGuidesChange,
+  onPauseToggle,
+  onRestart,
+  onStepFrame,
   onTimeScaleChange,
   onUserScaleChange,
+  onStageBackgroundModeChange,
   onAnimationSelect,
 }: {
   viewportRef: RefObject<HTMLDivElement | null>
@@ -59,9 +71,11 @@ export function WorkspacePanel({
   loop: boolean
   selectedAnimation: string
   showDebugGuides: boolean
+  isPaused: boolean
   timeScale: number
   userScale: number
   defaultScale: number
+  stageBackgroundMode: StageBackgroundMode
   atlasInfo: AtlasInfo | null
   animationSummaries: AnimationSummary[]
   animations: string[]
@@ -77,10 +91,30 @@ export function WorkspacePanel({
   onBack: () => void
   onLoopChange: (nextLoop: boolean) => void
   onDebugGuidesChange: (nextValue: boolean) => void
+  onPauseToggle: () => void
+  onRestart: () => void
+  onStepFrame: (direction: -1 | 1) => void
   onTimeScaleChange: (nextValue: number) => void
   onUserScaleChange: (nextValue: number) => void
+  onStageBackgroundModeChange: (mode: StageBackgroundMode) => void
   onAnimationSelect: (animationName: string) => void
 }) {
+  const dopesheetFps = sceneInfo?.dopesheetFps ?? null
+  const currentFrame =
+    playbackInfo && dopesheetFps && dopesheetFps > 0
+      ? Math.max(0, Math.floor(playbackInfo.currentTime * dopesheetFps))
+      : null
+  const totalFrames =
+    playbackInfo && dopesheetFps && dopesheetFps > 0
+      ? Math.max(1, Math.round(playbackInfo.duration * dopesheetFps))
+      : null
+  const stageBackgroundClass =
+    stageBackgroundMode === 'checkerboard'
+      ? 'bg-[linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06)),linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06))] bg-[length:28px_28px] bg-[position:0_0,14px_14px] bg-[#101826]'
+      : stageBackgroundMode === 'transparent'
+        ? 'bg-transparent'
+        : 'bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]'
+
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
       <div className="space-y-6 xl:sticky xl:top-[20px] xl:self-start">
@@ -91,7 +125,10 @@ export function WorkspacePanel({
         >
           <div
             ref={viewportRef}
-            className="relative min-h-[560px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
+            className={cn(
+              'relative min-h-[560px] overflow-hidden rounded-[28px] border border-border/60',
+              stageBackgroundClass,
+            )}
           >
             <div ref={canvasHostRef} className="h-full w-full" />
             {!hasScene ? (
@@ -121,6 +158,63 @@ export function WorkspacePanel({
           description="Drive animation selection, looping, speed, and display scale."
         >
           <div className="space-y-5">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Transport</p>
+                <p className="text-xs text-muted-foreground">Pause playback, restart the clip, or step one frame at a time.</p>
+              </div>
+              <ButtonGroup className="grid w-full grid-cols-2">
+                <Button variant="outline" className="h-11 w-full" onClick={onPauseToggle}>
+                  {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                  {isPaused ? 'Resume' : 'Pause'}
+                </Button>
+                <Button variant="outline" className="h-11 w-full" onClick={onRestart}>
+                  <TimerReset className="size-4" />
+                  Restart
+                </Button>
+              </ButtonGroup>
+              <ButtonGroup className="grid w-full grid-cols-2">
+                <Button variant="outline" className="h-11 w-full" onClick={() => onStepFrame(-1)}>
+                  <SkipBack className="size-4" />
+                  Frame Back
+                </Button>
+                <Button variant="outline" className="h-11 w-full" onClick={() => onStepFrame(1)}>
+                  <SkipForward className="size-4" />
+                  Frame Forward
+                </Button>
+              </ButtonGroup>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+              {currentFrame !== null && totalFrames !== null ? (
+                <span>
+                  Current frame <span className="font-semibold text-foreground">{currentFrame}</span> / {totalFrames}
+                </span>
+              ) : (
+                <span>Current frame unavailable until animation timing data is loaded.</span>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Stage background</p>
+                <p className="text-xs text-muted-foreground">Preview animation on checkerboard, dark, or transparent canvas.</p>
+              </div>
+              <ButtonGroup className="grid w-full grid-cols-3">
+                {(['checkerboard', 'dark', 'transparent'] as StageBackgroundMode[]).map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={stageBackgroundMode === mode ? 'default' : 'outline'}
+                    className="h-10 w-full capitalize"
+                    onClick={() => onStageBackgroundModeChange(mode)}
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </div>
+
             <label className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-foreground">Loop animation</p>

@@ -98,3 +98,5 @@ export type SceneInfo = {
   slotCount: number
   textureMemoryBytes: number | null
 }
+
+export type StageBackgroundMode = 'checkerboard' | 'dark' | 'transparent'

@@ -14,6 +14,7 @@ type LoadedScene = {
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
   debugBounds: Graphics
+  getAnimationLayoutBounds: (animationName: string) => { x: number; y: number; width: number; height: number } | null
   requestedScale: {
     value: number
   }
@@ -29,7 +30,13 @@ type SpineSize = {
   currentScale: number
   displayOffsetX: number
   displayOffsetY: number
+  layoutOffsetX: number
+  layoutOffsetY: number
   overflowingCanvas: boolean
+  layoutOriginX: number
+  layoutOriginY: number
+  layoutWidth: number
+  layoutHeight: number
   originX: number
   originY: number
   realWidth: number
@@ -77,6 +84,10 @@ type SceneInfo = {
 
 type AnimationSummary = {
   duration: number
+  layoutHeight: number
+  layoutOriginX: number
+  layoutOriginY: number
+  layoutWidth: number
   minHeight: number
   minWidth: number
   maxHeight: number
@@ -316,6 +327,10 @@ function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
 
     return {
       duration,
+      layoutHeight: maxBounds.height,
+      layoutOriginX: maxBounds.x,
+      layoutOriginY: maxBounds.y,
+      layoutWidth: maxBounds.width,
       maxHeight: maxBounds.height,
       maxWidth: maxBounds.width,
       minHeight: Number.isFinite(minHeight) ? minHeight : maxBounds.height,
@@ -376,11 +391,13 @@ function updateSpineLayout(
   height: number,
   requestedScale = 1,
   debugBounds: Graphics | null = null,
+  layoutBounds?: { x: number; y: number; width: number; height: number } | null,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
+  const anchorBounds = layoutBounds && layoutBounds.width > 0 && layoutBounds.height > 0 ? layoutBounds : bounds
   const normalizedRequestedScale = requestedScale > 0 ? requestedScale : 1
 
-  if (bounds.width <= 0 || bounds.height <= 0) {
+  if (anchorBounds.width <= 0 || anchorBounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(normalizedRequestedScale)
     drawAnimationBoundsBorder(debugBounds, bounds, spine.position, normalizedRequestedScale)
@@ -390,6 +407,12 @@ function updateSpineLayout(
       currentScale: normalizedRequestedScale,
       displayOffsetX: width * 0.5,
       displayOffsetY: height * 0.72,
+      layoutHeight: 0,
+      layoutOffsetX: width * 0.5,
+      layoutOffsetY: height * 0.72,
+      layoutOriginX: 0,
+      layoutOriginY: 0,
+      layoutWidth: 0,
       overflowingCanvas: false,
       originX: 0,
       originY: 0,
@@ -400,9 +423,9 @@ function updateSpineLayout(
     }
   }
 
-  const centerX = bounds.x + bounds.width * 0.5
-  const centerY = bounds.y + bounds.height * 0.5
-  const scale = getDisplayedScale(bounds.width, bounds.height, normalizedRequestedScale)
+  const centerX = anchorBounds.x + anchorBounds.width * 0.5
+  const centerY = anchorBounds.y + anchorBounds.height * 0.5
+  const scale = getDisplayedScale(anchorBounds.width, anchorBounds.height, normalizedRequestedScale)
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
@@ -414,6 +437,12 @@ function updateSpineLayout(
     currentScale: scale,
     displayOffsetX: spine.position.x + bounds.x * scale,
     displayOffsetY: spine.position.y + bounds.y * scale,
+    layoutHeight: anchorBounds.height,
+    layoutOffsetX: spine.position.x + anchorBounds.x * scale,
+    layoutOffsetY: spine.position.y + anchorBounds.y * scale,
+    layoutOriginX: anchorBounds.x,
+    layoutOriginY: anchorBounds.y,
+    layoutWidth: anchorBounds.width,
     overflowingCanvas: bounds.width * scale > width || bounds.height * scale > height,
     originX: bounds.x,
     originY: bounds.y,
@@ -509,10 +538,26 @@ async function loadScene(
     })
     const debugBounds = new Graphics()
     const animationSummaries = computeAnimationSummaries(spine)
+    const getAnimationLayoutBounds = (animationName: string) => {
+      const summary = animationSummaries.find((item) => item.name === animationName)
+
+      if (!summary) {
+        return null
+      }
+
+      return {
+        height: summary.layoutHeight,
+        width: summary.layoutWidth,
+        x: summary.layoutOriginX,
+        y: summary.layoutOriginY,
+      }
+    }
     const requestedScaleState = { value: requestedScale }
     let lastFpsUpdate = 0
 
     const syncSceneMetrics = () => {
+      const activeAnimation = spine.state.getCurrent(0)?.animation?.name ?? ''
+
       onSizeChange?.(
         updateSpineLayout(
           spine,
@@ -520,6 +565,7 @@ async function loadScene(
           app.screen.height,
           requestedScaleState.value,
           debugBounds,
+          getAnimationLayoutBounds(activeAnimation),
         ),
       )
       onPlaybackChange?.(computePlaybackInfo(spine))
@@ -547,6 +593,7 @@ async function loadScene(
         app.screen.height,
         requestedScaleState.value,
         debugBounds,
+        getAnimationLayoutBounds(animations[0] ?? ''),
       ),
     )
     onFpsChange?.(Math.round(app.ticker.FPS))
@@ -561,6 +608,7 @@ async function loadScene(
           app.screen.height,
           requestedScaleState.value,
           debugBounds,
+          getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
         ),
       )
     })
@@ -571,6 +619,7 @@ async function loadScene(
       atlasInfo,
       assetKeys,
       debugBounds,
+      getAnimationLayoutBounds,
       requestedScale: requestedScaleState,
       syncSceneMetrics,
       spine,
@@ -668,12 +717,13 @@ function App() {
     setPlaybackInfo(null)
     setRenderedSizeRange(null)
     const nextSpineSize = updateSpineLayout(
-        scene.spine,
-        scene.app.screen.width,
-        scene.app.screen.height,
-        userScale,
-        scene.debugBounds,
-      )
+      scene.spine,
+      scene.app.screen.width,
+      scene.app.screen.height,
+      userScale,
+      scene.debugBounds,
+      scene.getAnimationLayoutBounds(animationName),
+    )
 
     setSpineSize(nextSpineSize)
     setPlaybackInfo(computePlaybackInfo(scene.spine))
@@ -711,6 +761,7 @@ function App() {
         scene.app.screen.height,
         normalizedScale,
         scene.debugBounds,
+        scene.getAnimationLayoutBounds(selectedAnimation),
       ),
     )
   }
@@ -1107,6 +1158,11 @@ function App() {
                       ? `${Math.round(spineSize.displayOffsetX)}, ${Math.round(spineSize.displayOffsetY)}`
                       : 'Unavailable'}
                   </strong>
+                  <span className="viewer-stat-note">
+                    {spineSize
+                      ? `Stable anchor ${Math.round(spineSize.layoutOffsetX)}, ${Math.round(spineSize.layoutOffsetY)}`
+                      : 'Anchor unavailable'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1145,6 +1201,19 @@ function App() {
                     {maxSkeletonScaled
                       ? `Scaled ${Math.round(maxSkeletonScaled.width)} x ${Math.round(maxSkeletonScaled.height)} px`
                       : 'Scaled unavailable'}
+                  </span>
+                </div>
+                <div className="viewer-stat">
+                  <span className="viewer-stat-label">Layout Bounds</span>
+                  <strong className="viewer-stat-value">
+                    {spineSize
+                      ? `${Math.round(spineSize.layoutWidth)} x ${Math.round(spineSize.layoutHeight)} px`
+                      : 'Unavailable'}
+                  </strong>
+                  <span className="viewer-stat-note">
+                    {spineSize
+                      ? `Origin ${Math.round(spineSize.layoutOriginX)}, ${Math.round(spineSize.layoutOriginY)}`
+                      : 'Origin unavailable'}
                   </span>
                 </div>
                 <div className="viewer-stat">

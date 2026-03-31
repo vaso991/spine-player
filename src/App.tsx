@@ -13,6 +13,7 @@ type LoadedScene = {
   app: Application
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
+  debugAnchor: Graphics
   debugBounds: Graphics
   getAnimationLayoutBounds: (animationName: string) => { x: number; y: number; width: number; height: number } | null
   requestedScale: {
@@ -385,12 +386,51 @@ function drawAnimationBoundsBorder(
     })
 }
 
+function drawAnchorDot(
+  debugAnchor: Graphics | null,
+  anchorPosition: { x: number; y: number },
+  scale: number,
+) {
+  if (!debugAnchor) {
+    return
+  }
+
+  debugAnchor.clear()
+
+  const radius = Math.max(3, Math.min(6, 4 / Math.max(scale, 0.001)))
+  const crosshair = radius * 2.2
+
+  debugAnchor
+    .circle(anchorPosition.x, anchorPosition.y, radius)
+    .fill({
+      alpha: 0.95,
+      color: 0xff5d73,
+    })
+    .stroke({
+      alpha: 1,
+      color: 0xffffff,
+      pixelLine: true,
+      width: 1.25,
+    })
+    .moveTo(anchorPosition.x - crosshair, anchorPosition.y)
+    .lineTo(anchorPosition.x + crosshair, anchorPosition.y)
+    .moveTo(anchorPosition.x, anchorPosition.y - crosshair)
+    .lineTo(anchorPosition.x, anchorPosition.y + crosshair)
+    .stroke({
+      alpha: 0.9,
+      color: 0xff5d73,
+      pixelLine: true,
+      width: 1,
+    })
+}
+
 function updateSpineLayout(
   spine: Spine,
   width: number,
   height: number,
   requestedScale = 1,
   debugBounds: Graphics | null = null,
+  debugAnchor: Graphics | null = null,
   layoutBounds?: { x: number; y: number; width: number; height: number } | null,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
@@ -401,6 +441,7 @@ function updateSpineLayout(
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(normalizedRequestedScale)
     drawAnimationBoundsBorder(debugBounds, bounds, spine.position, normalizedRequestedScale)
+    drawAnchorDot(debugAnchor, spine.position, normalizedRequestedScale)
     return {
       canvasHeight: height,
       canvasWidth: width,
@@ -430,6 +471,7 @@ function updateSpineLayout(
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
   drawAnimationBoundsBorder(debugBounds, bounds, spine.position, scale)
+  drawAnchorDot(debugAnchor, spine.position, scale)
 
   return {
     canvasHeight: height,
@@ -536,6 +578,7 @@ async function loadScene(
       skeleton: skeletonAssetKey,
       ticker: app.ticker,
     })
+    const debugAnchor = new Graphics()
     const debugBounds = new Graphics()
     const animationSummaries = computeAnimationSummaries(spine)
     const getAnimationLayoutBounds = (animationName: string) => {
@@ -565,6 +608,7 @@ async function loadScene(
           app.screen.height,
           requestedScaleState.value,
           debugBounds,
+          debugAnchor,
           getAnimationLayoutBounds(activeAnimation),
         ),
       )
@@ -586,6 +630,7 @@ async function loadScene(
 
     app.stage.addChild(spine)
     app.stage.addChild(debugBounds)
+    app.stage.addChild(debugAnchor)
     onSizeChange?.(
       updateSpineLayout(
         spine,
@@ -593,6 +638,7 @@ async function loadScene(
         app.screen.height,
         requestedScaleState.value,
         debugBounds,
+        debugAnchor,
         getAnimationLayoutBounds(animations[0] ?? ''),
       ),
     )
@@ -608,6 +654,7 @@ async function loadScene(
           app.screen.height,
           requestedScaleState.value,
           debugBounds,
+          debugAnchor,
           getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
         ),
       )
@@ -618,6 +665,7 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      debugAnchor,
       debugBounds,
       getAnimationLayoutBounds,
       requestedScale: requestedScaleState,
@@ -640,6 +688,8 @@ function destroyScene(scene: LoadedScene | null) {
 
   scene.spine.autoUpdate = false
   scene.app.ticker.remove(scene.syncSceneMetrics)
+  scene.app.stage.removeChild(scene.debugAnchor)
+  scene.debugAnchor.destroy()
   scene.app.stage.removeChild(scene.debugBounds)
   scene.debugBounds.destroy()
   scene.app.stage.removeChild(scene.spine)
@@ -722,6 +772,7 @@ function App() {
       scene.app.screen.height,
       userScale,
       scene.debugBounds,
+      scene.debugAnchor,
       scene.getAnimationLayoutBounds(animationName),
     )
 
@@ -761,6 +812,7 @@ function App() {
         scene.app.screen.height,
         normalizedScale,
         scene.debugBounds,
+        scene.debugAnchor,
         scene.getAnimationLayoutBounds(selectedAnimation),
       ),
     )

@@ -7,17 +7,10 @@
 
 :root {
   color-scheme: dark;
-  --text: #bfd1df;
-  --text-h: #f5fbff;
-  --bg: #050b15;
   --border: oklch(1 0 0 / 10%);
-  --code-bg: rgba(127, 255, 212, 0.12);
   --sans: 'Satoshi', 'Avenir Next', 'Segoe UI', sans-serif;
-  --heading: 'Clash Display', 'Avenir Next Condensed', 'Segoe UI', sans-serif;
-  --mono: 'SFMono-Regular', 'SF Mono', Consolas, monospace;
   font: 17px/1.5 var(--sans);
   letter-spacing: 0.01em;
-  color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(57, 114, 255, 0.18), transparent 24%),
     radial-gradient(circle at top right, rgba(127, 255, 212, 0.08), transparent 20%),
@@ -72,43 +65,8 @@ body {
   overflow-x: hidden;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: clamp(2rem, 3.8vw, 3.4rem);
-  line-height: 0.96;
-  letter-spacing: -0.04em;
-  margin: 0 0 16px;
-}
-
-h2 {
-  font-size: 1.4rem;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
-}
-
 p {
   margin: 0;
-}
-
-code {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 8px;
-  color: #eafff8;
-}
-
-code {
-  font-size: 0.92em;
-  line-height: 1.35;
-  padding: 3px 8px;
-  background: var(--code-bg);
 }
 
 @theme inline {

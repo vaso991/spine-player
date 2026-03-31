@@ -40,6 +40,9 @@ type LoadedScene = {
   app: Application
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
+  debugEnabled: {
+    value: boolean
+  }
   debugAnchor: Graphics
   debugBounds: Graphics
   getAnimationLayoutBounds: (animationName: string) => { x: number; y: number; width: number; height: number } | null
@@ -636,17 +639,31 @@ function updateSpineLayout(
   requestedScale = 1,
   debugBounds: Graphics | null = null,
   debugAnchor: Graphics | null = null,
+  debugEnabled = true,
   layoutBounds?: { x: number; y: number; width: number; height: number } | null,
 ): SpineSize {
   const bounds = getSpineBounds(spine)
   const anchorBounds = layoutBounds && layoutBounds.width > 0 && layoutBounds.height > 0 ? layoutBounds : bounds
   const normalizedRequestedScale = requestedScale > 0 ? requestedScale : 1
 
+  if (debugBounds) {
+    debugBounds.visible = debugEnabled
+  }
+
+  if (debugAnchor) {
+    debugAnchor.visible = debugEnabled
+  }
+
   if (anchorBounds.width <= 0 || anchorBounds.height <= 0) {
     spine.position.set(width * 0.5, height * 0.72)
     spine.scale.set(normalizedRequestedScale)
-    drawAnimationBoundsBorder(debugBounds, bounds, spine.position, normalizedRequestedScale)
-    drawAnchorDot(debugAnchor, spine.position, normalizedRequestedScale)
+    if (debugEnabled) {
+      drawAnimationBoundsBorder(debugBounds, bounds, spine.position, normalizedRequestedScale)
+      drawAnchorDot(debugAnchor, spine.position, normalizedRequestedScale)
+    } else {
+      debugBounds?.clear()
+      debugAnchor?.clear()
+    }
     return {
       canvasHeight: height,
       canvasWidth: width,
@@ -675,8 +692,13 @@ function updateSpineLayout(
 
   spine.scale.set(scale)
   spine.position.set(width * 0.5 - centerX * scale, height * 0.5 - centerY * scale)
-  drawAnimationBoundsBorder(debugBounds, bounds, spine.position, scale)
-  drawAnchorDot(debugAnchor, spine.position, scale)
+  if (debugEnabled) {
+    drawAnimationBoundsBorder(debugBounds, bounds, spine.position, scale)
+    drawAnchorDot(debugAnchor, spine.position, scale)
+  } else {
+    debugBounds?.clear()
+    debugAnchor?.clear()
+  }
 
   return {
     canvasHeight: height,
@@ -801,6 +823,7 @@ async function loadScene(
       }
     }
     const requestedScaleState = { value: requestedScale }
+    const debugEnabledState = { value: true }
     let lastFpsUpdate = 0
 
     const syncSceneMetrics = () => {
@@ -814,6 +837,7 @@ async function loadScene(
           requestedScaleState.value,
           debugBounds,
           debugAnchor,
+          debugEnabledState.value,
           getAnimationLayoutBounds(activeAnimation),
         ),
       )
@@ -844,6 +868,7 @@ async function loadScene(
         requestedScaleState.value,
         debugBounds,
         debugAnchor,
+        debugEnabledState.value,
         getAnimationLayoutBounds(animations[0] ?? ''),
       ),
     )
@@ -860,6 +885,7 @@ async function loadScene(
           requestedScaleState.value,
           debugBounds,
           debugAnchor,
+          debugEnabledState.value,
           getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
         ),
       )
@@ -870,6 +896,7 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      debugEnabled: debugEnabledState,
       debugAnchor,
       debugBounds,
       getAnimationLayoutBounds,
@@ -916,6 +943,7 @@ function App() {
   const [animations, setAnimations] = useState<string[]>([])
   const [selectedAnimation, setSelectedAnimation] = useState('')
   const [loop, setLoop] = useState(true)
+  const [showDebugGuides, setShowDebugGuides] = useState(true)
   const [userScale, setUserScale] = useState(DEFAULT_USER_SCALE)
   const [timeScale, setTimeScale] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -980,6 +1008,7 @@ function App() {
       userScale,
       scene.debugBounds,
       scene.debugAnchor,
+      scene.debugEnabled.value,
       scene.getAnimationLayoutBounds(animationName),
     )
 
@@ -1020,6 +1049,32 @@ function App() {
         normalizedScale,
         scene.debugBounds,
         scene.debugAnchor,
+        scene.debugEnabled.value,
+        scene.getAnimationLayoutBounds(selectedAnimation),
+      ),
+    )
+  }
+
+  function updateDebugGuides(nextValue: boolean) {
+    const scene = sceneRef.current
+
+    setShowDebugGuides(nextValue)
+
+    if (!scene) {
+      return
+    }
+
+    scene.debugEnabled.value = nextValue
+
+    setSpineSize(
+      updateSpineLayout(
+        scene.spine,
+        scene.app.screen.width,
+        scene.app.screen.height,
+        scene.requestedScale.value,
+        scene.debugBounds,
+        scene.debugAnchor,
+        nextValue,
         scene.getAnimationLayoutBounds(selectedAnimation),
       ),
     )
@@ -1045,6 +1100,7 @@ function App() {
     setShowWorkspace(false)
     setSpineSize(null)
     setStatus('Upload Spine files and press Load demo.')
+    setShowDebugGuides(true)
     setUserScale(DEFAULT_USER_SCALE)
   }
 
@@ -1092,6 +1148,7 @@ function App() {
       setPlaybackInfo(null)
       setRenderedSizeRange(null)
       setSceneInfo(null)
+      setShowDebugGuides(true)
       setUserScale(DEFAULT_USER_SCALE)
     }
 
@@ -1139,6 +1196,7 @@ function App() {
         textureMemoryBytes: scene.atlasInfo?.textureMemoryBytes ?? null,
       })
       setLoop(true)
+      setShowDebugGuides(true)
       setStatus(
         scene.animations.length > 0
           ? `Loaded ${scene.animations.length} animation${scene.animations.length === 1 ? '' : 's'}.`
@@ -1157,6 +1215,7 @@ function App() {
       setPlaybackInfo(null)
       setRenderedSizeRange(null)
       setSceneInfo(null)
+      setShowDebugGuides(true)
       setSpineSize(null)
       setUserScale(DEFAULT_USER_SCALE)
       setError(message)
@@ -1367,6 +1426,19 @@ function App() {
                         setLoop(nextLoop)
                         updateAnimation(selectedAnimation, nextLoop)
                       }}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Show debug guides</p>
+                      <p className="text-xs text-muted-foreground">Toggle debug bounds and anchor overlays.</p>
+                    </div>
+                    <input
+                      className="size-4 accent-primary"
+                      type="checkbox"
+                      checked={showDebugGuides}
+                      onChange={(event) => updateDebugGuides(event.target.checked)}
                     />
                   </label>
 

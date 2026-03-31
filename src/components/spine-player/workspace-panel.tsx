@@ -60,6 +60,7 @@ export function WorkspacePanel({
   onPauseToggle,
   onRestart,
   onStepFrame,
+  onSeekFrame,
   onTimeScaleChange,
   onUserScaleChange,
   onStageBackgroundModeChange,
@@ -94,6 +95,7 @@ export function WorkspacePanel({
   onPauseToggle: () => void
   onRestart: () => void
   onStepFrame: (direction: -1 | 1) => void
+  onSeekFrame: (frame: number) => void
   onTimeScaleChange: (nextValue: number) => void
   onUserScaleChange: (nextValue: number) => void
   onStageBackgroundModeChange: (mode: StageBackgroundMode) => void
@@ -185,14 +187,24 @@ export function WorkspacePanel({
               </ButtonGroup>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-              {currentFrame !== null && totalFrames !== null ? (
-                <span>
-                  Current frame <span className="font-semibold text-foreground">{currentFrame}</span> / {totalFrames}
-                </span>
-              ) : (
-                <span>Current frame unavailable until animation timing data is loaded.</span>
-              )}
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Frame selector</p>
+                  <p className="text-xs text-muted-foreground">Jump directly to a frame on the active track.</p>
+                </div>
+                <div className="text-sm font-medium text-foreground">
+                  {currentFrame !== null && totalFrames !== null ? `${currentFrame} / ${totalFrames}` : 'N/A'}
+                </div>
+              </div>
+              <Slider
+                min={0}
+                max={totalFrames ?? 0}
+                step={1}
+                disabled={currentFrame === null || totalFrames === null}
+                value={[currentFrame ?? 0]}
+                onValueChange={([nextValue]) => onSeekFrame(nextValue ?? 0)}
+              />
             </div>
 
             <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">

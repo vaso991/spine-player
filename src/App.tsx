@@ -17,12 +17,6 @@ import {
 
 import { Button } from './components/ui/button'
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from './components/ui/accordion'
-import {
   Card,
   CardContent,
   CardDescription,
@@ -31,13 +25,6 @@ import {
 } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './components/ui/select'
 import { Slider } from './components/ui/slider'
 import { cn } from './lib/utils'
 
@@ -208,43 +195,6 @@ function SectionCard({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
-  )
-}
-
-function AccordionSectionCard({
-  value,
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  value: string
-  icon: typeof Sparkles
-  title: string
-  description: string
-  children: ReactNode
-}) {
-  return (
-    <AccordionItem value={value} className="border-none">
-      <Card className="rounded-[28px] border border-border/60 bg-card/75 shadow-[0_20px_80px_-40px_rgba(0,0,0,0.8)]">
-        <CardHeader className="pb-3">
-          <AccordionTrigger className="rounded-2xl px-0 py-0 hover:no-underline">
-            <div className="flex min-w-0 items-start gap-3 text-left">
-              <div className="mt-0.5 rounded-2xl border border-border/70 bg-background/80 p-2 text-muted-foreground">
-                <Icon className="size-4" />
-              </div>
-              <div className="min-w-0">
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </div>
-            </div>
-          </AccordionTrigger>
-        </CardHeader>
-        <AccordionContent className="px-5 pb-5">
-          {children}
-        </AccordionContent>
-      </Card>
-    </AccordionItem>
   )
 }
 
@@ -903,6 +853,7 @@ function App() {
   const [status, setStatus] = useState('Upload Spine files and press Load demo.')
   const [fps, setFps] = useState<number | null>(null)
   const [hasScene, setHasScene] = useState(false)
+  const [showWorkspace, setShowWorkspace] = useState(false)
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null)
   const [animationSummaries, setAnimationSummaries] = useState<AnimationSummary[]>([])
   const [atlasInfo, setAtlasInfo] = useState<AtlasInfo | null>(null)
@@ -1019,7 +970,16 @@ function App() {
   }
 
   async function handleLoad() {
+    if (!showWorkspace) {
+      setShowWorkspace(true)
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve())
+      })
+    }
+
     if (!viewportRef.current || !canvasHostRef.current) {
+      setError('Unable to prepare the Pixi stage.')
+      setStatus('Load failed.')
       return
     }
 
@@ -1168,8 +1128,8 @@ function App() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.14),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(34,197,94,0.12),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_26%)]" />
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-          <aside className="space-y-6">
+        {!showWorkspace ? (
+          <section className="mx-auto w-full max-w-2xl">
             <SectionCard
               icon={Upload}
               title="Asset Intake"
@@ -1253,252 +1213,129 @@ function App() {
                 </Button>
               </div>
             </SectionCard>
-
-            <SectionCard
-              icon={Clapperboard}
-              title="Playback Controls"
-              description="Drive animation selection, looping, speed, and display scale."
-            >
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="animation-select">Animation</Label>
-                  <Select
-                    disabled={animations.length === 0}
-                    value={selectedAnimation}
-                    onValueChange={(value) => updateAnimation(value, loop)}
-                  >
-                    <SelectTrigger
-                      id="animation-select"
-                      className="h-11 w-full rounded-2xl border-border/70 bg-background/70 px-4"
-                    >
-                      <SelectValue placeholder="No animations loaded" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {animations.map((animation) => (
-                        <SelectItem key={animation} value={animation}>
-                          {animation}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <label className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Loop animation</p>
-                    <p className="text-xs text-muted-foreground">Restart automatically when the track completes.</p>
-                  </div>
-                  <input
-                    className="size-4 accent-primary"
-                    type="checkbox"
-                    checked={loop}
-                    disabled={!selectedAnimation}
-                    onChange={(event) => {
-                      const nextLoop = event.target.checked
-
-                      setLoop(nextLoop)
-                      updateAnimation(selectedAnimation, nextLoop)
-                    }}
-                  />
-                </label>
-
-                <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Animation speed</p>
-                      <p className="text-xs text-muted-foreground">1 is normal, 0.5 is half, 2 is double.</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => updateTimeScale(1)}>
-                      <TimerReset className="size-3.5" />
-                      Reset
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
-                    <Slider
-                      min={0}
-                      max={3}
-                      step={0.05}
-                      value={[timeScale]}
-                      onValueChange={([nextValue]) => updateTimeScale(nextValue ?? 0)}
-                    />
-                    <Input
-                      className="h-10"
-                      type="number"
-                      min="0"
-                      max="3"
-                      step="0.05"
-                      value={timeScale}
-                      onChange={(event) => updateTimeScale(Number(event.target.value))}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Animation scale</p>
-                      <p className="text-xs text-muted-foreground">
-                        Defaults to atlas scale
-                        {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? ` (${atlasInfo.scale})` : ''}.
-                      </p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => updateUserScale(defaultScale)}>
-                      <TimerReset className="size-3.5" />
-                      Reset
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
-                    <Slider
-                      min={0.05}
-                      max={3}
-                      step={0.01}
-                      value={[userScale]}
-                      onValueChange={([nextValue]) => updateUserScale(nextValue ?? DEFAULT_USER_SCALE)}
-                    />
-                    <Input
-                      className="h-10"
-                      type="number"
-                      min="0.05"
-                      max="3"
-                      step="0.01"
-                      value={userScale}
-                      onChange={(event) => updateUserScale(Number(event.target.value))}
-                    />
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          </aside>
-
-          <div className="space-y-6">
-            <Accordion
-              type="multiple"
-              defaultValue={['runtime', 'geometry', 'atlas-rig', 'animation-summary']}
-              className="space-y-6"
-            >
-            <AccordionSectionCard
-              value="runtime"
-              icon={Activity}
-              title="Runtime Snapshot"
-              description="Playback state and render metrics for the active animation."
-            >
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                <MetricCard label="Animations" value={animations.length} note="Detected in the loaded skeleton" />
-                <MetricCard label="Active Animation" value={selectedAnimation || 'idle'} note="Current track on state 0" emphasis />
-                <MetricCard label="FPS" value={fps === null ? 'Unavailable' : fps} note="Renderer ticker snapshot" />
-                <MetricCard
-                  label="Current Time"
-                  value={playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
-                  note={playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
-                />
-                <MetricCard
-                  label="Duration"
-                  value={playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
-                  note={playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
-                />
-                <MetricCard
-                  label="Rendered Size"
-                  value={spineSize ? formatPixels(spineSize.realtimeWidth, spineSize.realtimeHeight) : 'Unavailable'}
-                  note={
-                    renderedSizeRange
-                      ? `Low ${formatPixels(renderedSizeRange.minWidth, renderedSizeRange.minHeight)} · Peak ${formatPixels(renderedSizeRange.maxWidth, renderedSizeRange.maxHeight)}`
-                      : 'Range unavailable'
-                  }
-                />
-                <MetricCard
-                  label="Current Scale"
-                  value={spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
-                  note={
-                    spineSize
-                      ? `Anchor ${formatPoint(spineSize.layoutOffsetX, spineSize.layoutOffsetY)}`
-                      : 'Anchor unavailable'
-                  }
-                />
-              </div>
-            </AccordionSectionCard>
-
-            <div className="grid gap-6 2xl:grid-cols-2">
-              <AccordionSectionCard
-                value="geometry"
-                icon={Layers3}
-                title="Geometry"
-                description="Bounds, scaling envelope, and web-safe size estimates."
+          </section>
+        ) : (
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
+            <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+              <SectionCard
+                icon={PackageOpen}
+                title="Pixi Stage"
+                description="Dedicated render surface for the loaded Spine scene."
               >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MetricCard label="Skeleton Bounds" value={spineSize ? formatPixels(spineSize.realWidth, spineSize.realHeight) : 'Unavailable'} />
-                  <MetricCard
-                    label="Min Skeleton"
-                    value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.minWidth, selectedAnimationSummary.minHeight) : 'Unavailable'}
-                    note={minSkeletonScaled ? `Scaled ${formatPixels(minSkeletonScaled.width, minSkeletonScaled.height)}` : 'Scaled unavailable'}
-                  />
-                  <MetricCard
-                    label="Max Skeleton"
-                    value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.maxWidth, selectedAnimationSummary.maxHeight) : 'Unavailable'}
-                    note={maxSkeletonScaled ? `Scaled ${formatPixels(maxSkeletonScaled.width, maxSkeletonScaled.height)}` : 'Scaled unavailable'}
-                  />
-                  <MetricCard
-                    label="Layout Bounds"
-                    value={spineSize ? formatPixels(spineSize.layoutWidth, spineSize.layoutHeight) : 'Unavailable'}
-                    note={spineSize ? `Origin ${formatPoint(spineSize.layoutOriginX, spineSize.layoutOriginY)}` : 'Origin unavailable'}
-                  />
-                  <MetricCard
-                    label="Bounds Aspect"
-                    value={spineSize && spineSize.realHeight > 0 ? (spineSize.realWidth / spineSize.realHeight).toFixed(3) : 'Unavailable'}
-                  />
-                  <MetricCard
-                    label="Bounds Origin"
-                    value={spineSize ? formatPoint(spineSize.originX, spineSize.originY) : 'Unavailable'}
-                    note={safeContainerSize ? `Safe web size ${formatPixels(safeContainerSize.width, safeContainerSize.height)}` : 'Safe size unavailable'}
-                  />
+                <div
+                  ref={viewportRef}
+                  className="relative min-h-[560px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
+                >
+                  <div ref={canvasHostRef} className="h-full w-full" />
+                  {!hasScene ? (
+                    <div className="absolute inset-0 grid place-items-center p-6">
+                      <div className="max-w-sm rounded-[24px] border border-dashed border-border/70 bg-background/50 px-6 py-8 text-center backdrop-blur">
+                        <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
+                        <p className="text-base font-medium text-foreground">Load local Spine assets to render the player.</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          The Pixi canvas lives here now, separated from the analytics cards for a cleaner layout.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </AccordionSectionCard>
-
-              <AccordionSectionCard
-                value="atlas-rig"
-                icon={ImageIcon}
-                title="Atlas + Rig"
-                description="Packing efficiency and skeleton structure details."
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MetricCard label="Atlas Pages" value={atlasInfo?.pageCount ?? '0'} note="PNG pages mapped from atlas" />
-                  <MetricCard label="Atlas Page" value={atlasInfo ? formatPixels(atlasInfo.pageWidth, atlasInfo.pageHeight) : 'Unavailable'} />
-                  <MetricCard
-                    label="Atlas Scale"
-                    value={atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? atlasInfo.scale : 'Unavailable'}
-                  />
-                  <MetricCard
-                    label="Atlas Utilization"
-                    value={
-                      sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
-                        ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
-                        : 'Unavailable'
-                    }
-                    note={atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
-                  />
-                  <MetricCard
-                    label="Texture Memory"
-                    value={
-                      sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
-                        ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
-                        : 'Unavailable'
-                    }
-                  />
-                  <MetricCard
-                    label="Bones / Slots"
-                    value={sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
-                    note={sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
-                  />
-                  <MetricCard
-                    label="Attachments / Events"
-                    value={sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
-                    note={sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
-                  />
-                </div>
-              </AccordionSectionCard>
+              </SectionCard>
             </div>
 
-              <AccordionSectionCard
-                value="animation-summary"
+            <aside className="space-y-6">
+              <SectionCard
+                icon={Clapperboard}
+                title="Playback Controls"
+                description="Drive animation selection, looping, speed, and display scale."
+              >
+                <div className="space-y-5">
+                  <label className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Loop animation</p>
+                      <p className="text-xs text-muted-foreground">Restart automatically when the track completes.</p>
+                    </div>
+                    <input
+                      className="size-4 accent-primary"
+                      type="checkbox"
+                      checked={loop}
+                      disabled={!selectedAnimation}
+                      onChange={(event) => {
+                        const nextLoop = event.target.checked
+
+                        setLoop(nextLoop)
+                        updateAnimation(selectedAnimation, nextLoop)
+                      }}
+                    />
+                  </label>
+
+                  <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Animation speed</p>
+                        <p className="text-xs text-muted-foreground">1 is normal, 0.5 is half, 2 is double.</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => updateTimeScale(1)}>
+                        <TimerReset className="size-3.5" />
+                        Reset
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
+                      <Slider
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        value={[timeScale]}
+                        onValueChange={([nextValue]) => updateTimeScale(nextValue ?? 0)}
+                      />
+                      <Input
+                        className="h-10"
+                        type="number"
+                        min="0"
+                        max="3"
+                        step="0.05"
+                        value={timeScale}
+                        onChange={(event) => updateTimeScale(Number(event.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Animation scale</p>
+                        <p className="text-xs text-muted-foreground">
+                          Defaults to atlas scale
+                          {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? ` (${atlasInfo.scale})` : ''}.
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => updateUserScale(defaultScale)}>
+                        <TimerReset className="size-3.5" />
+                        Reset
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
+                      <Slider
+                        min={0.05}
+                        max={3}
+                        step={0.01}
+                        value={[userScale]}
+                        onValueChange={([nextValue]) => updateUserScale(nextValue ?? DEFAULT_USER_SCALE)}
+                      />
+                      <Input
+                        className="h-10"
+                        type="number"
+                        min="0.05"
+                        max="3"
+                        step="0.01"
+                        value={userScale}
+                        onChange={(event) => updateUserScale(Number(event.target.value))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard
                 icon={Boxes}
                 title="Animation Summary"
                 description="Quick-select animation clips and inspect their max layout footprint."
@@ -1508,7 +1345,7 @@ function App() {
                     No animation summary available.
                   </div>
                 ) : (
-                  <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                  <div className="flex flex-col gap-3">
                     {animationSummaries.map((animation) => (
                       <button
                         type="button"
@@ -1537,34 +1374,129 @@ function App() {
                     ))}
                   </div>
                 )}
-              </AccordionSectionCard>
-            </Accordion>
+              </SectionCard>
 
-            <SectionCard
-              icon={PackageOpen}
-              title="Pixi Stage"
-              description="Dedicated render surface for the loaded Spine scene."
-            >
-              <div
-                ref={viewportRef}
-                className="relative min-h-[460px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
+              <SectionCard
+                icon={Activity}
+                title="Runtime Snapshot"
+                description="Playback state and render metrics for the active animation."
               >
-                <div ref={canvasHostRef} className="h-full w-full" />
-                {!hasScene ? (
-                  <div className="absolute inset-0 grid place-items-center p-6">
-                    <div className="max-w-sm rounded-[24px] border border-dashed border-border/70 bg-background/50 px-6 py-8 text-center backdrop-blur">
-                      <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
-                      <p className="text-base font-medium text-foreground">Load local Spine assets to render the player.</p>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        The Pixi canvas lives here now, separated from the analytics cards for a cleaner layout.
-                      </p>
-                    </div>
+                <div className="flex flex-col gap-3">
+                  <MetricCard label="Animations" value={animations.length} note="Detected in the loaded skeleton" />
+                  <MetricCard label="Active Animation" value={selectedAnimation || 'idle'} note="Current track on state 0" emphasis />
+                  <MetricCard label="FPS" value={fps === null ? 'Unavailable' : fps} note="Renderer ticker snapshot" />
+                  <MetricCard
+                    label="Current Time"
+                    value={playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
+                    note={playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
+                  />
+                  <MetricCard
+                    label="Duration"
+                    value={playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
+                    note={playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
+                  />
+                  <MetricCard
+                    label="Rendered Size"
+                    value={spineSize ? formatPixels(spineSize.realtimeWidth, spineSize.realtimeHeight) : 'Unavailable'}
+                    note={
+                      renderedSizeRange
+                        ? `Low ${formatPixels(renderedSizeRange.minWidth, renderedSizeRange.minHeight)} · Peak ${formatPixels(renderedSizeRange.maxWidth, renderedSizeRange.maxHeight)}`
+                        : 'Range unavailable'
+                    }
+                  />
+                  <MetricCard
+                    label="Current Scale"
+                    value={spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
+                    note={
+                      spineSize
+                        ? `Anchor ${formatPoint(spineSize.layoutOffsetX, spineSize.layoutOffsetY)}`
+                        : 'Anchor unavailable'
+                    }
+                  />
+                </div>
+              </SectionCard>
+
+              <div className="flex flex-col gap-6">
+                <SectionCard
+                  icon={Layers3}
+                  title="Geometry"
+                  description="Bounds, scaling envelope, and web-safe size estimates."
+                >
+                  <div className="flex flex-col gap-3">
+                    <MetricCard label="Skeleton Bounds" value={spineSize ? formatPixels(spineSize.realWidth, spineSize.realHeight) : 'Unavailable'} />
+                    <MetricCard
+                      label="Min Skeleton"
+                      value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.minWidth, selectedAnimationSummary.minHeight) : 'Unavailable'}
+                      note={minSkeletonScaled ? `Scaled ${formatPixels(minSkeletonScaled.width, minSkeletonScaled.height)}` : 'Scaled unavailable'}
+                    />
+                    <MetricCard
+                      label="Max Skeleton"
+                      value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.maxWidth, selectedAnimationSummary.maxHeight) : 'Unavailable'}
+                      note={maxSkeletonScaled ? `Scaled ${formatPixels(maxSkeletonScaled.width, maxSkeletonScaled.height)}` : 'Scaled unavailable'}
+                    />
+                    <MetricCard
+                      label="Layout Bounds"
+                      value={spineSize ? formatPixels(spineSize.layoutWidth, spineSize.layoutHeight) : 'Unavailable'}
+                      note={spineSize ? `Origin ${formatPoint(spineSize.layoutOriginX, spineSize.layoutOriginY)}` : 'Origin unavailable'}
+                    />
+                    <MetricCard
+                      label="Bounds Aspect"
+                      value={spineSize && spineSize.realHeight > 0 ? (spineSize.realWidth / spineSize.realHeight).toFixed(3) : 'Unavailable'}
+                    />
+                    <MetricCard
+                      label="Bounds Origin"
+                      value={spineSize ? formatPoint(spineSize.originX, spineSize.originY) : 'Unavailable'}
+                      note={safeContainerSize ? `Safe web size ${formatPixels(safeContainerSize.width, safeContainerSize.height)}` : 'Safe size unavailable'}
+                    />
                   </div>
-                ) : null}
+                </SectionCard>
+
+                <SectionCard
+                  icon={ImageIcon}
+                  title="Atlas + Rig"
+                  description="Packing efficiency and skeleton structure details."
+                >
+                  <div className="flex flex-col gap-3">
+                    <MetricCard label="Atlas Pages" value={atlasInfo?.pageCount ?? '0'} note="PNG pages mapped from atlas" />
+                    <MetricCard label="Atlas Page" value={atlasInfo ? formatPixels(atlasInfo.pageWidth, atlasInfo.pageHeight) : 'Unavailable'} />
+                    <MetricCard
+                      label="Atlas Scale"
+                      value={atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? atlasInfo.scale : 'Unavailable'}
+                    />
+                    <MetricCard
+                      label="Atlas Utilization"
+                      value={
+                        sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
+                          ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
+                          : 'Unavailable'
+                      }
+                      note={atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
+                    />
+                    <MetricCard
+                      label="Texture Memory"
+                      value={
+                        sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
+                          ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
+                          : 'Unavailable'
+                      }
+                    />
+                    <MetricCard
+                      label="Bones / Slots"
+                      value={sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
+                      note={sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
+                    />
+                    <MetricCard
+                      label="Attachments / Events"
+                      value={sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
+                      note={sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
+                    />
+                  </div>
+                </SectionCard>
               </div>
-            </SectionCard>
-          </div>
-        </section>
+
+            </aside>
+          </section>
+        )}
 
         <footer className="pb-2 text-center text-xs tracking-[0.24em] text-muted-foreground">
           With ❤️ from BEON

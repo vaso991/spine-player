@@ -17,6 +17,12 @@ import {
 
 import { Button } from './components/ui/button'
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from './components/ui/accordion'
+import {
   Card,
   CardContent,
   CardDescription,
@@ -202,6 +208,43 @@ function SectionCard({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  )
+}
+
+function AccordionSectionCard({
+  value,
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  value: string
+  icon: typeof Sparkles
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <AccordionItem value={value} className="border-none">
+      <Card className="rounded-[28px] border border-border/60 bg-card/75 shadow-[0_20px_80px_-40px_rgba(0,0,0,0.8)]">
+        <CardHeader className="pb-3">
+          <AccordionTrigger className="rounded-2xl px-0 py-0 hover:no-underline">
+            <div className="flex min-w-0 items-start gap-3 text-left">
+              <div className="mt-0.5 rounded-2xl border border-border/70 bg-background/80 p-2 text-muted-foreground">
+                <Icon className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </div>
+            </div>
+          </AccordionTrigger>
+        </CardHeader>
+        <AccordionContent className="px-5 pb-5">
+          {children}
+        </AccordionContent>
+      </Card>
+    </AccordionItem>
   )
 }
 
@@ -1328,7 +1371,13 @@ function App() {
           </aside>
 
           <div className="space-y-6">
-            <SectionCard
+            <Accordion
+              type="multiple"
+              defaultValue={['runtime', 'geometry', 'atlas-rig', 'animation-summary']}
+              className="space-y-6"
+            >
+            <AccordionSectionCard
+              value="runtime"
               icon={Activity}
               title="Runtime Snapshot"
               description="Playback state and render metrics for the active animation."
@@ -1366,10 +1415,11 @@ function App() {
                   }
                 />
               </div>
-            </SectionCard>
+            </AccordionSectionCard>
 
             <div className="grid gap-6 2xl:grid-cols-2">
-              <SectionCard
+              <AccordionSectionCard
+                value="geometry"
                 icon={Layers3}
                 title="Geometry"
                 description="Bounds, scaling envelope, and web-safe size estimates."
@@ -1401,9 +1451,10 @@ function App() {
                     note={safeContainerSize ? `Safe web size ${formatPixels(safeContainerSize.width, safeContainerSize.height)}` : 'Safe size unavailable'}
                   />
                 </div>
-              </SectionCard>
+              </AccordionSectionCard>
 
-              <SectionCard
+              <AccordionSectionCard
+                value="atlas-rig"
                 icon={ImageIcon}
                 title="Atlas + Rig"
                 description="Packing efficiency and skeleton structure details."
@@ -1443,75 +1494,77 @@ function App() {
                     note={sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
                   />
                 </div>
-              </SectionCard>
+              </AccordionSectionCard>
             </div>
 
+              <AccordionSectionCard
+                value="animation-summary"
+                icon={Boxes}
+                title="Animation Summary"
+                description="Quick-select animation clips and inspect their max layout footprint."
+              >
+                {animationSummaries.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border/60 bg-background/50 px-4 py-6 text-sm text-muted-foreground">
+                    No animation summary available.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                    {animationSummaries.map((animation) => (
+                      <button
+                        type="button"
+                        key={animation.name}
+                        className={cn(
+                          'rounded-2xl border p-4 text-left transition',
+                          animation.name === selectedAnimation
+                            ? 'border-primary/40 bg-primary/10 shadow-lg shadow-primary/10'
+                            : 'border-border/60 bg-card/60 hover:border-border hover:bg-card',
+                        )}
+                        onClick={() => updateAnimation(animation.name, loop)}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-semibold text-foreground">{animation.name}</span>
+                          <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1 text-[0.65rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                            {animation.duration.toFixed(2)}s
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {formatPixels(animation.maxWidth, animation.maxHeight)}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          Minimum footprint {formatPixels(animation.minWidth, animation.minHeight)}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </AccordionSectionCard>
+            </Accordion>
+
             <SectionCard
-              icon={Boxes}
-              title="Animation Summary"
-              description="Quick-select animation clips and inspect their max layout footprint."
+              icon={PackageOpen}
+              title="Pixi Stage"
+              description="Dedicated render surface for the loaded Spine scene."
             >
-              {animationSummaries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border/60 bg-background/50 px-4 py-6 text-sm text-muted-foreground">
-                  No animation summary available.
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                  {animationSummaries.map((animation) => (
-                    <button
-                      type="button"
-                      key={animation.name}
-                      className={cn(
-                        'rounded-2xl border p-4 text-left transition',
-                        animation.name === selectedAnimation
-                          ? 'border-primary/40 bg-primary/10 shadow-lg shadow-primary/10'
-                          : 'border-border/60 bg-card/60 hover:border-border hover:bg-card',
-                      )}
-                      onClick={() => updateAnimation(animation.name, loop)}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-sm font-semibold text-foreground">{animation.name}</span>
-                        <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1 text-[0.65rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-                          {animation.duration.toFixed(2)}s
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        {formatPixels(animation.maxWidth, animation.maxHeight)}
+              <div
+                ref={viewportRef}
+                className="relative min-h-[460px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
+              >
+                <div ref={canvasHostRef} className="h-full w-full" />
+                {!hasScene ? (
+                  <div className="absolute inset-0 grid place-items-center p-6">
+                    <div className="max-w-sm rounded-[24px] border border-dashed border-border/70 bg-background/50 px-6 py-8 text-center backdrop-blur">
+                      <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
+                      <p className="text-base font-medium text-foreground">Load local Spine assets to render the player.</p>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        The Pixi canvas lives here now, separated from the analytics cards for a cleaner layout.
                       </p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        Minimum footprint {formatPixels(animation.minWidth, animation.minHeight)}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </SectionCard>
           </div>
         </section>
-
-        <SectionCard
-          icon={PackageOpen}
-          title="Pixi Stage"
-          description="Dedicated render surface for the loaded Spine scene."
-        >
-          <div
-            ref={viewportRef}
-            className="relative min-h-[460px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
-          >
-            <div ref={canvasHostRef} className="h-full w-full" />
-            {!hasScene ? (
-              <div className="absolute inset-0 grid place-items-center p-6">
-                <div className="max-w-sm rounded-[24px] border border-dashed border-border/70 bg-background/50 px-6 py-8 text-center backdrop-blur">
-                  <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
-                  <p className="text-base font-medium text-foreground">Load local Spine assets to render the player.</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    The Pixi canvas lives here now, separated from the analytics cards for a cleaner layout.
-                  </p>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </SectionCard>
 
         <footer className="pb-2 text-center text-xs tracking-[0.24em] text-muted-foreground">
           With ❤️ from BEON

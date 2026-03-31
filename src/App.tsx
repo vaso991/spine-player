@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Boxes,
   Clapperboard,
+  FileUp,
   Image as ImageIcon,
   Layers3,
   PackageOpen,
@@ -206,7 +207,7 @@ function FileInputField({
   accept,
   multiple = false,
   filesLabel,
-  onChange,
+  onFilesSelected,
 }: {
   id: string
   label: string
@@ -214,22 +215,89 @@ function FileInputField({
   accept: string
   multiple?: boolean
   filesLabel: string
-  onChange: React.ChangeEventHandler<HTMLInputElement>
+  onFilesSelected: (files: FileList | File[]) => void
 }) {
+  const [isDragging, setIsDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragging(false)
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragging(false)
+
+    if (event.dataTransfer.files.length > 0) {
+      onFilesSelected(event.dataTransfer.files)
+    }
+  }
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="rounded-2xl border border-border/60 bg-background/60 p-3">
+      <div
+        className={cn(
+          'rounded-2xl border border-dashed bg-background/60 p-4 transition-all',
+          isDragging
+            ? 'border-primary/70 bg-primary/10 shadow-lg shadow-primary/10 ring-2 ring-primary/30'
+            : 'border-border/60 hover:border-primary/40 hover:bg-background/80',
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <button
+          type="button"
+          className="flex w-full flex-col items-center justify-center rounded-[20px] border border-border/50 bg-card/40 px-5 py-8 text-center transition hover:bg-card/60"
+          onClick={() => inputRef.current?.click()}
+        >
+          <div
+            className={cn(
+              'mb-4 flex size-12 items-center justify-center rounded-full border transition-colors',
+              isDragging
+                ? 'border-primary/60 bg-primary/15 text-primary'
+                : 'border-border/60 bg-background/80 text-muted-foreground',
+            )}
+          >
+            <FileUp className="size-5" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">
+            Drag and drop file{multiple ? 's' : ''} here
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            or click to browse {multiple ? 'your files' : 'a file'}
+          </p>
+          <p className="mt-3 text-[0.7rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+            Accepted: {accept.split(',').join(' ')}
+          </p>
+        </button>
         <input
+          ref={inputRef}
           id={id}
-          className="block w-full cursor-pointer text-sm text-muted-foreground file:mr-3 file:cursor-pointer file:rounded-xl file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-secondary-foreground hover:file:bg-secondary/80"
+          className="sr-only"
           type="file"
           accept={accept}
           multiple={multiple}
-          onChange={onChange}
+          onChange={(event) => {
+            if (event.target.files) {
+              onFilesSelected(event.target.files)
+            }
+          }}
         />
-        <p className="mt-3 break-words text-xs leading-5 text-muted-foreground">{filesLabel}</p>
-        {hint ? <p className="mt-1 text-xs leading-5 text-muted-foreground/80">{hint}</p> : null}
+        <div className="mt-4 rounded-xl border border-border/50 bg-background/50 px-3 py-2">
+          <p className="text-[0.68rem] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            Selected
+          </p>
+          <p className="mt-1 break-words text-xs leading-5 text-foreground/90">{filesLabel}</p>
+        </div>
+        {hint ? <p className="mt-3 text-xs leading-5 text-muted-foreground/80">{hint}</p> : null}
       </div>
     </div>
   )
@@ -980,7 +1048,7 @@ function App() {
     setUserScale(DEFAULT_USER_SCALE)
   }
 
-  function applyCombinedFiles(fileList: FileList | null) {
+  function applyCombinedFiles(fileList: FileList | File[] | null) {
     if (!fileList || fileList.length === 0) {
       return
     }
@@ -1174,7 +1242,7 @@ function App() {
                     .filter(Boolean)
                     .join(', ') || 'No files selected'}
                   hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`, and `.png`."
-                  onChange={(event) => applyCombinedFiles(event.target.files)}
+                  onFilesSelected={(selectedFiles) => applyCombinedFiles(selectedFiles)}
                 />
 
                 <div className="grid gap-4">
@@ -1183,10 +1251,10 @@ function App() {
                     label="Atlas file"
                     accept=".atlas,text/plain"
                     filesLabel={files.atlas?.name ?? 'No atlas selected'}
-                    onChange={(event) =>
+                    onFilesSelected={(selectedFiles) =>
                       setFiles((current) => ({
                         ...current,
-                        atlas: event.target.files?.[0] ?? null,
+                        atlas: Array.from(selectedFiles)[0] ?? null,
                       }))
                     }
                   />
@@ -1196,10 +1264,10 @@ function App() {
                     label="Skeleton binary"
                     accept=".skel,application/octet-stream"
                     filesLabel={files.skeleton?.name ?? 'No .skel selected'}
-                    onChange={(event) =>
+                    onFilesSelected={(selectedFiles) =>
                       setFiles((current) => ({
                         ...current,
-                        skeleton: event.target.files?.[0] ?? null,
+                        skeleton: Array.from(selectedFiles)[0] ?? null,
                       }))
                     }
                   />
@@ -1214,10 +1282,10 @@ function App() {
                         ? files.images.map((file) => file.name).join(', ')
                         : 'No PNG selected'
                     }
-                    onChange={(event) =>
+                    onFilesSelected={(selectedFiles) =>
                       setFiles((current) => ({
                         ...current,
-                        images: Array.from(event.target.files ?? []),
+                        images: Array.from(selectedFiles),
                       }))
                     }
                   />

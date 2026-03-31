@@ -1,7 +1,39 @@
+import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Application, Assets, Graphics, ImageSource } from 'pixi.js'
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8'
-import './App.css'
+import {
+  Activity,
+  Boxes,
+  Clapperboard,
+  Image as ImageIcon,
+  Layers3,
+  PackageOpen,
+  Play,
+  Sparkles,
+  TimerReset,
+  Upload,
+} from 'lucide-react'
+
+import { Button } from './components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from './components/ui/card'
+import { Input } from './components/ui/input'
+import { Label } from './components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select'
+import { Slider } from './components/ui/slider'
+import { cn } from './lib/utils'
 
 type SelectedFiles = {
   atlas: File | null
@@ -97,6 +129,117 @@ type AnimationSummary = {
 }
 
 const DEFAULT_USER_SCALE = 1
+
+function formatPixels(width?: number | null, height?: number | null) {
+  if (width === null || width === undefined || height === null || height === undefined) {
+    return 'Unavailable'
+  }
+
+  return `${Math.round(width)} x ${Math.round(height)} px`
+}
+
+function formatPoint(x?: number | null, y?: number | null) {
+  if (x === null || x === undefined || y === null || y === undefined) {
+    return 'Unavailable'
+  }
+
+  return `${Math.round(x)}, ${Math.round(y)}`
+}
+
+function MetricCard({
+  label,
+  value,
+  note,
+  emphasis = false,
+}: {
+  label: string
+  value: string | number
+  note?: string
+  emphasis?: boolean
+}) {
+  return (
+    <Card
+      size="sm"
+      className={cn(
+        'gap-0 rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm',
+        emphasis
+          ? 'border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-orange-400/10 to-background/80'
+          : 'border-border/60 bg-card/70',
+      )}
+    >
+      <p className="text-[0.68rem] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-semibold tracking-tight text-foreground">{value}</p>
+      {note ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{note}</p> : null}
+    </Card>
+  )
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: typeof Sparkles
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <Card className="rounded-[28px] border border-border/60 bg-card/75 shadow-[0_20px_80px_-40px_rgba(0,0,0,0.8)]">
+      <CardHeader className="pb-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-2xl border border-border/70 bg-background/80 p-2 text-muted-foreground">
+            <Icon className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  )
+}
+
+function FileInputField({
+  id,
+  label,
+  hint,
+  accept,
+  multiple = false,
+  filesLabel,
+  onChange,
+}: {
+  id: string
+  label: string
+  hint?: string
+  accept: string
+  multiple?: boolean
+  filesLabel: string
+  onChange: React.ChangeEventHandler<HTMLInputElement>
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="rounded-2xl border border-border/60 bg-background/60 p-3">
+        <input
+          id={id}
+          className="block w-full cursor-pointer text-sm text-muted-foreground file:mr-3 file:cursor-pointer file:rounded-xl file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-secondary-foreground hover:file:bg-secondary/80"
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          onChange={onChange}
+        />
+        <p className="mt-3 break-words text-xs leading-5 text-muted-foreground">{filesLabel}</p>
+        {hint ? <p className="mt-1 text-xs leading-5 text-muted-foreground/80">{hint}</p> : null}
+      </div>
+    </div>
+  )
+}
 
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file)
@@ -978,420 +1121,402 @@ function App() {
   const defaultScale = atlasInfo?.scale ?? DEFAULT_USER_SCALE
 
   return (
-    <main className="app-shell">
-      <section className="workspace">
-        <aside className="controls">
-          <label className="field">
-            <span>All Spine files</span>
-            <input
-              type="file"
-              accept=".atlas,.skel,.png,text/plain,application/octet-stream,image/png"
-              multiple
-              onChange={(event) => applyCombinedFiles(event.target.files)}
-            />
-            <small>Select the full set at once. The picker will detect `.atlas`, `.skel`, and `.png` files automatically.</small>
-          </label>
+    <main className="relative min-h-svh overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.14),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(34,197,94,0.12),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_26%)]" />
 
-          <label className="field">
-            <span>Atlas file</span>
-            <input
-              type="file"
-              accept=".atlas,text/plain"
-              onChange={(event) =>
-                setFiles((current) => ({
-                  ...current,
-                  atlas: event.target.files?.[0] ?? null,
-                }))
-              }
-            />
-            <small>{files.atlas?.name ?? 'No atlas selected'}</small>
-          </label>
-
-          <label className="field">
-            <span>Skeleton binary</span>
-            <input
-              type="file"
-              accept=".skel,application/octet-stream"
-              onChange={(event) =>
-                setFiles((current) => ({
-                  ...current,
-                  skeleton: event.target.files?.[0] ?? null,
-                }))
-              }
-            />
-            <small>{files.skeleton?.name ?? 'No .skel selected'}</small>
-          </label>
-
-          <label className="field">
-            <span>Atlas PNG pages</span>
-            <input
-              type="file"
-              accept=".png,image/png"
-              multiple
-              onChange={(event) =>
-                setFiles((current) => ({
-                  ...current,
-                  images: Array.from(event.target.files ?? []),
-                }))
-              }
-            />
-            <small>
-              {files.images.length > 0
-                ? files.images.map((file) => file.name).join(', ')
-                : 'No PNG selected'}
-            </small>
-          </label>
-
-          <div className="messages">
-            <p className="status">{status}</p>
-            {error ? <p className="error">{error}</p> : null}
-          </div>
-
-          <button className="primary-action" disabled={!canLoad} onClick={handleLoad}>
-            {loading ? 'Loading…' : 'Load demo'}
-          </button>
-
-          <label className="field">
-            <span>Animation</span>
-            <select
-              disabled={animations.length === 0}
-              value={selectedAnimation}
-              onChange={(event) => updateAnimation(event.target.value, loop)}
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <aside className="space-y-6">
+            <SectionCard
+              icon={Upload}
+              title="Asset Intake"
+              description="Load your atlas, skeleton binary, and page textures."
             >
-              {animations.length === 0 ? (
-                <option value="">No animations loaded</option>
+              <div className="space-y-4">
+                <FileInputField
+                  id="all-spine-files"
+                  label="All Spine files"
+                  accept=".atlas,.skel,.png,text/plain,application/octet-stream,image/png"
+                  multiple
+                  filesLabel={[
+                    files.atlas?.name,
+                    files.skeleton?.name,
+                    ...files.images.map((file) => file.name),
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'No files selected'}
+                  hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`, and `.png`."
+                  onChange={(event) => applyCombinedFiles(event.target.files)}
+                />
+
+                <div className="grid gap-4">
+                  <FileInputField
+                    id="atlas-file"
+                    label="Atlas file"
+                    accept=".atlas,text/plain"
+                    filesLabel={files.atlas?.name ?? 'No atlas selected'}
+                    onChange={(event) =>
+                      setFiles((current) => ({
+                        ...current,
+                        atlas: event.target.files?.[0] ?? null,
+                      }))
+                    }
+                  />
+
+                  <FileInputField
+                    id="skeleton-file"
+                    label="Skeleton binary"
+                    accept=".skel,application/octet-stream"
+                    filesLabel={files.skeleton?.name ?? 'No .skel selected'}
+                    onChange={(event) =>
+                      setFiles((current) => ({
+                        ...current,
+                        skeleton: event.target.files?.[0] ?? null,
+                      }))
+                    }
+                  />
+
+                  <FileInputField
+                    id="atlas-images"
+                    label="Atlas PNG pages"
+                    accept=".png,image/png"
+                    multiple
+                    filesLabel={
+                      files.images.length > 0
+                        ? files.images.map((file) => file.name).join(', ')
+                        : 'No PNG selected'
+                    }
+                    onChange={(event) =>
+                      setFiles((current) => ({
+                        ...current,
+                        images: Array.from(event.target.files ?? []),
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <p className="text-sm font-medium text-foreground">{status}</p>
+                  {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+                </div>
+
+                <Button
+                  className="h-11 w-full rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                  disabled={!canLoad}
+                  onClick={handleLoad}
+                >
+                  <Play className="size-4" />
+                  {loading ? 'Loading…' : 'Load demo'}
+                </Button>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              icon={Clapperboard}
+              title="Playback Controls"
+              description="Drive animation selection, looping, speed, and display scale."
+            >
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="animation-select">Animation</Label>
+                  <Select
+                    disabled={animations.length === 0}
+                    value={selectedAnimation}
+                    onValueChange={(value) => updateAnimation(value, loop)}
+                  >
+                    <SelectTrigger
+                      id="animation-select"
+                      className="h-11 w-full rounded-2xl border-border/70 bg-background/70 px-4"
+                    >
+                      <SelectValue placeholder="No animations loaded" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {animations.map((animation) => (
+                        <SelectItem key={animation} value={animation}>
+                          {animation}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Loop animation</p>
+                    <p className="text-xs text-muted-foreground">Restart automatically when the track completes.</p>
+                  </div>
+                  <input
+                    className="size-4 accent-primary"
+                    type="checkbox"
+                    checked={loop}
+                    disabled={!selectedAnimation}
+                    onChange={(event) => {
+                      const nextLoop = event.target.checked
+
+                      setLoop(nextLoop)
+                      updateAnimation(selectedAnimation, nextLoop)
+                    }}
+                  />
+                </label>
+
+                <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Animation speed</p>
+                      <p className="text-xs text-muted-foreground">1 is normal, 0.5 is half, 2 is double.</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => updateTimeScale(1)}>
+                      <TimerReset className="size-3.5" />
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
+                    <Slider
+                      min={0}
+                      max={3}
+                      step={0.05}
+                      value={[timeScale]}
+                      onValueChange={([nextValue]) => updateTimeScale(nextValue ?? 0)}
+                    />
+                    <Input
+                      className="h-10"
+                      type="number"
+                      min="0"
+                      max="3"
+                      step="0.05"
+                      value={timeScale}
+                      onChange={(event) => updateTimeScale(Number(event.target.value))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Animation scale</p>
+                      <p className="text-xs text-muted-foreground">
+                        Defaults to atlas scale
+                        {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? ` (${atlasInfo.scale})` : ''}.
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => updateUserScale(defaultScale)}>
+                      <TimerReset className="size-3.5" />
+                      Reset
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
+                    <Slider
+                      min={0.05}
+                      max={3}
+                      step={0.01}
+                      value={[userScale]}
+                      onValueChange={([nextValue]) => updateUserScale(nextValue ?? DEFAULT_USER_SCALE)}
+                    />
+                    <Input
+                      className="h-10"
+                      type="number"
+                      min="0.05"
+                      max="3"
+                      step="0.01"
+                      value={userScale}
+                      onChange={(event) => updateUserScale(Number(event.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          </aside>
+
+          <div className="space-y-6">
+            <SectionCard
+              icon={Activity}
+              title="Runtime Snapshot"
+              description="Playback state and render metrics for the active animation."
+            >
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                <MetricCard label="Animations" value={animations.length} note="Detected in the loaded skeleton" />
+                <MetricCard label="Active Animation" value={selectedAnimation || 'idle'} note="Current track on state 0" emphasis />
+                <MetricCard label="FPS" value={fps === null ? 'Unavailable' : fps} note="Renderer ticker snapshot" />
+                <MetricCard
+                  label="Current Time"
+                  value={playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
+                  note={playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
+                />
+                <MetricCard
+                  label="Duration"
+                  value={playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
+                  note={playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
+                />
+                <MetricCard
+                  label="Rendered Size"
+                  value={spineSize ? formatPixels(spineSize.realtimeWidth, spineSize.realtimeHeight) : 'Unavailable'}
+                  note={
+                    renderedSizeRange
+                      ? `Low ${formatPixels(renderedSizeRange.minWidth, renderedSizeRange.minHeight)} · Peak ${formatPixels(renderedSizeRange.maxWidth, renderedSizeRange.maxHeight)}`
+                      : 'Range unavailable'
+                  }
+                />
+                <MetricCard
+                  label="Current Scale"
+                  value={spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
+                  note={
+                    spineSize
+                      ? `Anchor ${formatPoint(spineSize.layoutOffsetX, spineSize.layoutOffsetY)}`
+                      : 'Anchor unavailable'
+                  }
+                />
+              </div>
+            </SectionCard>
+
+            <div className="grid gap-6 2xl:grid-cols-2">
+              <SectionCard
+                icon={Layers3}
+                title="Geometry"
+                description="Bounds, scaling envelope, and web-safe size estimates."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard label="Skeleton Bounds" value={spineSize ? formatPixels(spineSize.realWidth, spineSize.realHeight) : 'Unavailable'} />
+                  <MetricCard
+                    label="Min Skeleton"
+                    value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.minWidth, selectedAnimationSummary.minHeight) : 'Unavailable'}
+                    note={minSkeletonScaled ? `Scaled ${formatPixels(minSkeletonScaled.width, minSkeletonScaled.height)}` : 'Scaled unavailable'}
+                  />
+                  <MetricCard
+                    label="Max Skeleton"
+                    value={selectedAnimationSummary ? formatPixels(selectedAnimationSummary.maxWidth, selectedAnimationSummary.maxHeight) : 'Unavailable'}
+                    note={maxSkeletonScaled ? `Scaled ${formatPixels(maxSkeletonScaled.width, maxSkeletonScaled.height)}` : 'Scaled unavailable'}
+                  />
+                  <MetricCard
+                    label="Layout Bounds"
+                    value={spineSize ? formatPixels(spineSize.layoutWidth, spineSize.layoutHeight) : 'Unavailable'}
+                    note={spineSize ? `Origin ${formatPoint(spineSize.layoutOriginX, spineSize.layoutOriginY)}` : 'Origin unavailable'}
+                  />
+                  <MetricCard
+                    label="Bounds Aspect"
+                    value={spineSize && spineSize.realHeight > 0 ? (spineSize.realWidth / spineSize.realHeight).toFixed(3) : 'Unavailable'}
+                  />
+                  <MetricCard
+                    label="Bounds Origin"
+                    value={spineSize ? formatPoint(spineSize.originX, spineSize.originY) : 'Unavailable'}
+                    note={safeContainerSize ? `Safe web size ${formatPixels(safeContainerSize.width, safeContainerSize.height)}` : 'Safe size unavailable'}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                icon={ImageIcon}
+                title="Atlas + Rig"
+                description="Packing efficiency and skeleton structure details."
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard label="Atlas Pages" value={atlasInfo?.pageCount ?? '0'} note="PNG pages mapped from atlas" />
+                  <MetricCard label="Atlas Page" value={atlasInfo ? formatPixels(atlasInfo.pageWidth, atlasInfo.pageHeight) : 'Unavailable'} />
+                  <MetricCard
+                    label="Atlas Scale"
+                    value={atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? atlasInfo.scale : 'Unavailable'}
+                  />
+                  <MetricCard
+                    label="Atlas Utilization"
+                    value={
+                      sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
+                        ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
+                        : 'Unavailable'
+                    }
+                    note={atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
+                  />
+                  <MetricCard
+                    label="Texture Memory"
+                    value={
+                      sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
+                        ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
+                        : 'Unavailable'
+                    }
+                  />
+                  <MetricCard
+                    label="Bones / Slots"
+                    value={sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
+                    note={sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
+                  />
+                  <MetricCard
+                    label="Attachments / Events"
+                    value={sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
+                    note={sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
+                  />
+                </div>
+              </SectionCard>
+            </div>
+
+            <SectionCard
+              icon={Boxes}
+              title="Animation Summary"
+              description="Quick-select animation clips and inspect their max layout footprint."
+            >
+              {animationSummaries.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/60 bg-background/50 px-4 py-6 text-sm text-muted-foreground">
+                  No animation summary available.
+                </div>
               ) : (
-                animations.map((animation) => (
-                  <option key={animation} value={animation}>
-                    {animation}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={loop}
-              disabled={!selectedAnimation}
-              onChange={(event) => {
-                const nextLoop = event.target.checked
-
-                setLoop(nextLoop)
-                updateAnimation(selectedAnimation, nextLoop)
-              }}
-            />
-            <span>Loop animation</span>
-          </label>
-
-          <label className="field">
-            <div className="field-header">
-              <span>Animation speed</span>
-              <button
-                type="button"
-                className="field-reset"
-                onClick={() => updateTimeScale(1)}
-              >
-                Reset
-              </button>
-            </div>
-            <div className="timescale-row">
-              <input
-                type="range"
-                min="0"
-                max="3"
-                step="0.05"
-                value={timeScale}
-                onChange={(event) => updateTimeScale(Number(event.target.value))}
-              />
-              <input
-                type="number"
-                min="0"
-                max="3"
-                step="0.05"
-                value={timeScale}
-                onChange={(event) => updateTimeScale(Number(event.target.value))}
-              />
-            </div>
-            <small>`1` is normal speed, `0.5` is half speed, `2` is double speed.</small>
-          </label>
-
-          <label className="field">
-            <div className="field-header">
-              <span>Animation scale</span>
-              <button
-                type="button"
-                className="field-reset"
-                onClick={() => updateUserScale(defaultScale)}
-              >
-                Reset
-              </button>
-            </div>
-            <div className="timescale-row">
-              <input
-                type="range"
-                min="0.05"
-                max="3"
-                step="0.01"
-                value={userScale}
-                onChange={(event) => updateUserScale(Number(event.target.value))}
-              />
-              <input
-                type="number"
-                min="0.05"
-                max="3"
-                step="0.01"
-                value={userScale}
-                onChange={(event) => updateUserScale(Number(event.target.value))}
-              />
-            </div>
-            <small>
-              Defaults to atlas scale
-              {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined ? ` (${atlasInfo.scale})` : ''}.
-            </small>
-          </label>
-        </aside>
-
-        <div className="viewer-panel">
-          <div className="viewer-chrome">
-            <div className="viewer-metric-group">
-              <span className="viewer-section-label">Realtime</span>
-              <div className="viewer-metrics">
-                <div className="viewer-stat viewer-stat-primary">
-                  <span className="viewer-stat-label">Active Animation</span>
-                  <strong className="viewer-stat-value">{selectedAnimation || 'idle'}</strong>
-                </div>
-                <div className="viewer-stat viewer-stat-fps">
-                  <span className="viewer-stat-label">FPS</span>
-                  <strong className="viewer-stat-value">{fps === null ? 'Unavailable' : fps}</strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Current Time</span>
-                  <strong className="viewer-stat-value">
-                    {playbackInfo ? `${playbackInfo.currentTime.toFixed(2)}s` : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {playbackInfo ? `${Math.round(playbackInfo.progress * 100)}% progress` : 'Progress unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Animation Duration</span>
-                  <strong className="viewer-stat-value">
-                    {playbackInfo ? `${playbackInfo.duration.toFixed(2)}s` : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {playbackInfo ? `Loops ${playbackInfo.loopCount}` : 'Loop count unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Rendered Size</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize
-                      ? `${Math.round(spineSize.realtimeWidth)} x ${Math.round(spineSize.realtimeHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {renderedSizeRange
-                      ? `Low ${Math.round(renderedSizeRange.minWidth)} x ${Math.round(renderedSizeRange.minHeight)} px · Peak ${Math.round(renderedSizeRange.maxWidth)} x ${Math.round(renderedSizeRange.maxHeight)} px`
-                      : 'Range unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Current Scale</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize ? spineSize.currentScale.toFixed(3) : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Display Offset</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize
-                      ? `${Math.round(spineSize.displayOffsetX)}, ${Math.round(spineSize.displayOffsetY)}`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {spineSize
-                      ? `Stable anchor ${Math.round(spineSize.layoutOffsetX)}, ${Math.round(spineSize.layoutOffsetY)}`
-                      : 'Anchor unavailable'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="viewer-metric-group">
-              <span className="viewer-section-label">Skeleton</span>
-              <div className="viewer-metrics">
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Skeleton Bounds</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize
-                      ? `${Math.round(spineSize.realWidth)} x ${Math.round(spineSize.realHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Min Skeleton</span>
-                  <strong className="viewer-stat-value">
-                    {selectedAnimationSummary
-                      ? `${Math.round(selectedAnimationSummary.minWidth)} x ${Math.round(selectedAnimationSummary.minHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {minSkeletonScaled
-                      ? `Scaled ${Math.round(minSkeletonScaled.width)} x ${Math.round(minSkeletonScaled.height)} px`
-                      : 'Scaled unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Max Skeleton</span>
-                  <strong className="viewer-stat-value">
-                    {selectedAnimationSummary
-                      ? `${Math.round(selectedAnimationSummary.maxWidth)} x ${Math.round(selectedAnimationSummary.maxHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {maxSkeletonScaled
-                      ? `Scaled ${Math.round(maxSkeletonScaled.width)} x ${Math.round(maxSkeletonScaled.height)} px`
-                      : 'Scaled unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Layout Bounds</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize
-                      ? `${Math.round(spineSize.layoutWidth)} x ${Math.round(spineSize.layoutHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {spineSize
-                      ? `Origin ${Math.round(spineSize.layoutOriginX)}, ${Math.round(spineSize.layoutOriginY)}`
-                      : 'Origin unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Bounds Aspect</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize && spineSize.realHeight > 0
-                      ? (spineSize.realWidth / spineSize.realHeight).toFixed(3)
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Bounds Origin</span>
-                  <strong className="viewer-stat-value">
-                    {spineSize
-                      ? `${Math.round(spineSize.originX)}, ${Math.round(spineSize.originY)}`
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Safe Web Size</span>
-                  <strong className="viewer-stat-value">
-                    {safeContainerSize
-                      ? `${Math.round(safeContainerSize.width)} x ${Math.round(safeContainerSize.height)} px`
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-            <div className="viewer-metric-group">
-              <span className="viewer-section-label">Atlas</span>
-              <div className="viewer-metrics">
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Atlas Page</span>
-                  <strong className="viewer-stat-value">
-                    {atlasInfo
-                      ? `${Math.round(atlasInfo.pageWidth)} x ${Math.round(atlasInfo.pageHeight)} px`
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Atlas Scale</span>
-                  <strong className="viewer-stat-value">
-                    {atlasInfo?.scale !== null && atlasInfo?.scale !== undefined
-                      ? atlasInfo.scale
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Atlas Utilization</span>
-                  <strong className="viewer-stat-value">
-                    {sceneInfo?.atlasUtilization !== null && sceneInfo?.atlasUtilization !== undefined
-                      ? `${Math.round(sceneInfo.atlasUtilization * 100)}%`
-                      : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {atlasInfo ? `${atlasInfo.regionCount} regions across ${atlasInfo.pageCount} page(s)` : 'Atlas unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Texture Memory</span>
-                  <strong className="viewer-stat-value">
-                    {sceneInfo?.textureMemoryBytes !== null && sceneInfo?.textureMemoryBytes !== undefined
-                      ? `${(sceneInfo.textureMemoryBytes / (1024 * 1024)).toFixed(2)} MB`
-                      : 'Unavailable'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-            <div className="viewer-metric-group">
-              <span className="viewer-section-label">Rig</span>
-              <div className="viewer-metrics">
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Bones / Slots</span>
-                  <strong className="viewer-stat-value">
-                    {sceneInfo ? `${sceneInfo.boneCount} / ${sceneInfo.slotCount}` : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {sceneInfo ? `${sceneInfo.skinCount} skins, ${sceneInfo.constraintCount} constraints` : 'Rig unavailable'}
-                  </span>
-                </div>
-                <div className="viewer-stat">
-                  <span className="viewer-stat-label">Attachments / Events</span>
-                  <strong className="viewer-stat-value">
-                    {sceneInfo ? `${sceneInfo.attachmentCount} / ${sceneInfo.eventCount}` : 'Unavailable'}
-                  </strong>
-                  <span className="viewer-stat-note">
-                    {sceneInfo?.dopesheetFps ? `Dopesheet ${sceneInfo.dopesheetFps} fps` : 'Dopesheet unavailable'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="viewer-animation-summary">
-              <span className="viewer-section-label">Animation Summary</span>
-              <div className="viewer-summary-list">
-                {animationSummaries.length === 0 ? (
-                  <div className="viewer-summary-row viewer-summary-empty">No animation summary available.</div>
-                ) : (
-                  animationSummaries.map((animation) => (
+                <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                  {animationSummaries.map((animation) => (
                     <button
                       type="button"
                       key={animation.name}
-                      className={`viewer-summary-row${animation.name === selectedAnimation ? ' viewer-summary-row-active' : ''}`}
+                      className={cn(
+                        'rounded-2xl border p-4 text-left transition',
+                        animation.name === selectedAnimation
+                          ? 'border-primary/40 bg-primary/10 shadow-lg shadow-primary/10'
+                          : 'border-border/60 bg-card/60 hover:border-border hover:bg-card',
+                      )}
                       onClick={() => updateAnimation(animation.name, loop)}
                     >
-                      <span className="viewer-summary-name">{animation.name}</span>
-                      <span className="viewer-summary-meta">
-                        {animation.duration.toFixed(2)}s
-                        {' · '}
-                        {Math.round(animation.maxWidth)} x {Math.round(animation.maxHeight)}
-                      </span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-sm font-semibold text-foreground">{animation.name}</span>
+                        <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1 text-[0.65rem] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                          {animation.duration.toFixed(2)}s
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {formatPixels(animation.maxWidth, animation.maxHeight)}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Minimum footprint {formatPixels(animation.minWidth, animation.minHeight)}
+                      </p>
                     </button>
-                  ))
-                )}
-              </div>
-            </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
           </div>
-          <div ref={viewportRef} className="viewer-stage">
-            <div ref={canvasHostRef} className="viewer-canvas-host" />
-            <div className={`viewer-placeholder${hasScene ? ' viewer-placeholder-hidden' : ''}`}>
-              <p>Load local Spine assets to render the player.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <footer className="app-footer">With ❤️ from BEON</footer>
+        <SectionCard
+          icon={PackageOpen}
+          title="Pixi Stage"
+          description="Dedicated render surface for the loaded Spine scene."
+        >
+          <div
+            ref={viewportRef}
+            className="relative min-h-[460px] overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]"
+          >
+            <div ref={canvasHostRef} className="h-full w-full" />
+            {!hasScene ? (
+              <div className="absolute inset-0 grid place-items-center p-6">
+                <div className="max-w-sm rounded-[24px] border border-dashed border-border/70 bg-background/50 px-6 py-8 text-center backdrop-blur">
+                  <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />
+                  <p className="text-base font-medium text-foreground">Load local Spine assets to render the player.</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    The Pixi canvas lives here now, separated from the analytics cards for a cleaner layout.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        <footer className="pb-2 text-center text-xs tracking-[0.24em] text-muted-foreground">
+          With ❤️ from BEON
+        </footer>
+      </div>
     </main>
   )
 }

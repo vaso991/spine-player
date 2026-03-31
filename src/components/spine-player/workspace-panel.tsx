@@ -1,9 +1,10 @@
-import type { RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 import {
   Activity,
   ArrowLeft,
   Boxes,
   Clapperboard,
+  Code2,
   Image as ImageIcon,
   Layers3,
   Pause,
@@ -19,6 +20,7 @@ import { ButtonGroup } from '../ui/button-group'
 import { Input } from '../ui/input'
 import { Slider } from '../ui/slider'
 import { cn } from '../../lib/utils'
+import { CodePreviewDialog } from './code-preview-dialog'
 import { MetricCard, SectionCard, formatPixels, formatPoint } from './shared'
 import type {
   AnimationSummary,
@@ -101,6 +103,7 @@ export function WorkspacePanel({
   onStageBackgroundModeChange: (mode: StageBackgroundMode) => void
   onAnimationSelect: (animationName: string) => void
 }) {
+  const [showCodePreview, setShowCodePreview] = useState(false)
   const dopesheetFps = sceneInfo?.dopesheetFps ?? null
   const currentFrame =
     playbackInfo && dopesheetFps && dopesheetFps > 0
@@ -362,6 +365,16 @@ export function WorkspacePanel({
           )}
         </SectionCard>
 
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full rounded-2xl border-cyan-300/20 bg-cyan-300/6 text-cyan-50 hover:bg-cyan-300/10"
+          onClick={() => setShowCodePreview(true)}
+        >
+          <Code2 className="size-4" />
+          Preview Pixi + Spine Code
+        </Button>
+
         <SectionCard
           icon={Activity}
           title="Runtime Snapshot"
@@ -475,6 +488,17 @@ export function WorkspacePanel({
             </div>
           </SectionCard>
         </div>
+
+        <CodePreviewDialog
+          open={showCodePreview}
+          onClose={() => setShowCodePreview(false)}
+          selectedAnimation={selectedAnimation}
+          loop={loop}
+          isPaused={isPaused}
+          timeScale={timeScale}
+          userScale={userScale}
+          stageBackgroundMode={stageBackgroundMode}
+        />
       </aside>
     </section>
   )

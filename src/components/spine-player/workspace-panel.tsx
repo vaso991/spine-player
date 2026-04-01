@@ -1,4 +1,4 @@
-import { useState, type RefObject } from 'react'
+import { useState, type RefObject } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -13,16 +13,16 @@ import {
   SkipBack,
   SkipForward,
   TimerReset,
-} from 'lucide-react'
+} from 'lucide-react';
 
-import { Button } from '../ui/button'
-import { ButtonGroup } from '../ui/button-group'
-import { Input } from '../ui/input'
-import { Slider } from '../ui/slider'
-import { cn } from '../../lib/utils'
-import { CodePreviewDialog } from './code-preview-dialog'
-import { PixiStage } from './pixi-stage'
-import { MetricCard, SectionCard, formatPixels, formatPoint } from './shared'
+import { Button } from '../ui/button';
+import { ButtonGroup } from '../ui/button-group';
+import { Input } from '../ui/input';
+import { Slider } from '../ui/slider';
+import { cn } from '../../lib/utils';
+import { CodePreviewDialog } from './code-preview-dialog';
+import { PixiStage } from './pixi-stage';
+import { MetricCard, SectionCard, formatPixels, formatPoint } from './shared';
 import type {
   AnimationSummary,
   AtlasInfo,
@@ -32,7 +32,7 @@ import type {
   SceneInfo,
   SpineSize,
   StageBackgroundMode,
-} from './types'
+} from './types';
 
 export function WorkspacePanel({
   viewportRef,
@@ -107,22 +107,22 @@ export function WorkspacePanel({
   onStageBackgroundModeChange: (mode: StageBackgroundMode) => void
   onAnimationSelect: (animationName: string) => void
 }) {
-  const [showCodePreview, setShowCodePreview] = useState(false)
-  const dopesheetFps = sceneInfo?.dopesheetFps ?? null
+  const [showCodePreview, setShowCodePreview] = useState(false);
+  const dopesheetFps = sceneInfo?.dopesheetFps ?? null;
   const currentFrame =
     playbackInfo && dopesheetFps && dopesheetFps > 0
       ? Math.max(0, Math.floor(playbackInfo.currentTime * dopesheetFps))
-      : null
+      : null;
   const totalFrames =
     playbackInfo && dopesheetFps && dopesheetFps > 0
       ? Math.max(1, Math.round(playbackInfo.duration * dopesheetFps))
-      : null
+      : null;
   const stageBackgroundClass =
     stageBackgroundMode === 'checkerboard'
       ? 'bg-[linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06)),linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06))] bg-[length:28px_28px] bg-[position:0_0,14px_14px] bg-[#101826]'
       : stageBackgroundMode === 'transparent'
         ? 'bg-transparent'
-        : 'bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]'
+        : 'bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]';
 
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
@@ -505,5 +505,5 @@ export function WorkspacePanel({
         />
       </aside>
     </section>
-  )
+  );
 }

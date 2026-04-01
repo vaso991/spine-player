@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { Sparkles } from 'lucide-react'
+import type { ReactNode } from 'react';
+import { Sparkles } from 'lucide-react';
 
 import {
   Card,
@@ -7,23 +7,23 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '../ui/card'
-import { cn } from '../../lib/utils'
+} from '../ui/card';
+import { cn } from '../../lib/utils';
 
 export function formatPixels(width?: number | null, height?: number | null) {
   if (width === null || width === undefined || height === null || height === undefined) {
-    return 'Unavailable'
+    return 'Unavailable';
   }
 
-  return `${Math.round(width)} x ${Math.round(height)} px`
+  return `${Math.round(width)} x ${Math.round(height)} px`;
 }
 
 export function formatPoint(x?: number | null, y?: number | null) {
   if (x === null || x === undefined || y === null || y === undefined) {
-    return 'Unavailable'
+    return 'Unavailable';
   }
 
-  return `${Math.round(x)}, ${Math.round(y)}`
+  return `${Math.round(x)}, ${Math.round(y)}`;
 }
 
 export function MetricCard({
@@ -53,7 +53,7 @@ export function MetricCard({
       <p className="mt-2 text-base font-semibold tracking-tight text-foreground">{value}</p>
       {note ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{note}</p> : null}
     </Card>
-  )
+  );
 }
 
 export function SectionCard({
@@ -82,5 +82,5 @@ export function SectionCard({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
-  )
+  );
 }

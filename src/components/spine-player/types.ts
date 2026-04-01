@@ -1,5 +1,5 @@
-import type { Application, Graphics } from 'pixi.js'
-import type { Spine } from '@esotericsoftware/spine-pixi-v8'
+import type { Application, Graphics } from 'pixi.js';
+import type { Spine } from '@esotericsoftware/spine-pixi-v8';
 
 export type SelectedFiles = {
   atlas: File | null

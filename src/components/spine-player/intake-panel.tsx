@@ -1,9 +1,9 @@
-import { Play, Upload } from 'lucide-react'
+import { Play, Upload } from 'lucide-react';
 
-import { Button } from '../ui/button'
-import { FileInputField } from './file-input-field'
-import { SectionCard } from './shared'
-import type { SelectedFiles } from './types'
+import { Button } from '../ui/button';
+import { FileInputField } from './file-input-field';
+import { SectionCard } from './shared';
+import type { SelectedFiles } from './types';
 
 export function IntakePanel({
   files,
@@ -116,5 +116,5 @@ export function IntakePanel({
         </div>
       </SectionCard>
     </section>
-  )
+  );
 }

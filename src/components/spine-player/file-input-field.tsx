@@ -1,56 +1,56 @@
-import { useRef, useState } from 'react'
-import { FileUp } from 'lucide-react'
+import { useRef, useState } from 'react';
+import { FileUp } from 'lucide-react';
 
-import { Button } from '../ui/button'
-import { Label } from '../ui/label'
-import { cn } from '../../lib/utils'
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
+import { cn } from '../../lib/utils';
 
 function matchesAcceptRule(file: File, acceptRule: string) {
-  const normalizedRule = acceptRule.trim().toLowerCase()
+  const normalizedRule = acceptRule.trim().toLowerCase();
 
   if (!normalizedRule) {
-    return true
+    return true;
   }
 
-  const fileName = file.name.toLowerCase()
-  const fileType = file.type.toLowerCase()
+  const fileName = file.name.toLowerCase();
+  const fileType = file.type.toLowerCase();
 
   if (normalizedRule.startsWith('.')) {
-    return fileName.endsWith(normalizedRule)
+    return fileName.endsWith(normalizedRule);
   }
 
   if (normalizedRule.endsWith('/*')) {
-    const baseType = normalizedRule.slice(0, -1)
-    return fileType.startsWith(baseType)
+    const baseType = normalizedRule.slice(0, -1);
+    return fileType.startsWith(baseType);
   }
 
-  return fileType === normalizedRule
+  return fileType === normalizedRule;
 }
 
 function filterAcceptedFiles(fileList: FileList | File[], accept: string) {
-  const files = Array.from(fileList)
+  const files = Array.from(fileList);
   const acceptRules = accept
     .split(',')
     .map((rule) => rule.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 
   if (acceptRules.length === 0) {
-    return { acceptedFiles: files, rejectedFiles: [] as File[] }
+    return { acceptedFiles: files, rejectedFiles: [] as File[] };
   }
 
-  const acceptedFiles: File[] = []
-  const rejectedFiles: File[] = []
+  const acceptedFiles: File[] = [];
+  const rejectedFiles: File[] = [];
 
   for (const file of files) {
     if (acceptRules.some((rule) => matchesAcceptRule(file, rule))) {
-      acceptedFiles.push(file)
-      continue
+      acceptedFiles.push(file);
+      continue;
     }
 
-    rejectedFiles.push(file)
+    rejectedFiles.push(file);
   }
 
-  return { acceptedFiles, rejectedFiles }
+  return { acceptedFiles, rejectedFiles };
 }
 
 export function FileInputField({
@@ -72,45 +72,45 @@ export function FileInputField({
   mode?: 'dropzone' | 'compact'
   onFilesSelected: (files: FileList | File[]) => void
 }) {
-  const [isDragging, setIsDragging] = useState(false)
-  const [validationMessage, setValidationMessage] = useState('')
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const acceptedLabel = accept.split(',').join(' ')
+  const [isDragging, setIsDragging] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const acceptedLabel = accept.split(',').join(' ');
 
   function applySelection(fileList: FileList | File[]) {
-    const { acceptedFiles, rejectedFiles } = filterAcceptedFiles(fileList, accept)
+    const { acceptedFiles, rejectedFiles } = filterAcceptedFiles(fileList, accept);
 
     if (rejectedFiles.length > 0) {
       setValidationMessage(
         `Ignored unsupported file${rejectedFiles.length > 1 ? 's' : ''}: ${rejectedFiles
           .map((file) => file.name)
           .join(', ')}.`,
-      )
+      );
     } else {
-      setValidationMessage('')
+      setValidationMessage('');
     }
 
     if (acceptedFiles.length > 0) {
-      onFilesSelected(acceptedFiles)
+      onFilesSelected(acceptedFiles);
     }
   }
 
   function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault()
-    setIsDragging(true)
+    event.preventDefault();
+    setIsDragging(true);
   }
 
   function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault()
-    setIsDragging(false)
+    event.preventDefault();
+    setIsDragging(false);
   }
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault()
-    setIsDragging(false)
+    event.preventDefault();
+    setIsDragging(false);
 
     if (event.dataTransfer.files.length > 0) {
-      applySelection(event.dataTransfer.files)
+      applySelection(event.dataTransfer.files);
     }
   }
 
@@ -149,7 +149,7 @@ export function FileInputField({
             multiple={multiple}
             onChange={(event) => {
               if (event.target.files) {
-                applySelection(event.target.files)
+                applySelection(event.target.files);
               }
             }}
           />
@@ -203,7 +203,7 @@ export function FileInputField({
             multiple={multiple}
             onChange={(event) => {
               if (event.target.files) {
-                applySelection(event.target.files)
+                applySelection(event.target.files);
               }
             }}
           />
@@ -220,5 +220,5 @@ export function FileInputField({
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,52 +1,52 @@
-import { Application as PixiApplication, useApplication, useExtend } from '@pixi/react'
-import { type Application, Container } from 'pixi.js'
-import { useEffect, useRef, type RefObject } from 'react'
+import { Application as PixiApplication, useApplication, useExtend } from '@pixi/react';
+import { type Application, Container } from 'pixi.js';
+import { useEffect, useRef, type RefObject } from 'react';
 
-import type { LoadedScene } from './types'
+import type { LoadedScene } from './types';
 
 function StageContents({
   scene,
 }: {
   scene: LoadedScene | null
 }) {
-  const { app } = useApplication()
-  const containerRef = useRef<Container | null>(null)
+  const { app } = useApplication();
+  const containerRef = useRef<Container | null>(null);
 
-  useExtend({ Container })
+  useExtend({ Container });
 
   useEffect(() => {
-    const container = containerRef.current
+    const container = containerRef.current;
 
     if (!container) {
-      return
+      return;
     }
 
-    container.removeChildren()
+    container.removeChildren();
 
     if (!scene || scene.app !== app) {
-      return
+      return;
     }
 
-    container.addChild(scene.spine)
-    container.addChild(scene.debugBounds)
-    container.addChild(scene.debugAnchor)
+    container.addChild(scene.spine);
+    container.addChild(scene.debugBounds);
+    container.addChild(scene.debugAnchor);
 
     return () => {
       if (scene.spine.parent === container) {
-        container.removeChild(scene.spine)
+        container.removeChild(scene.spine);
       }
 
       if (scene.debugBounds.parent === container) {
-        container.removeChild(scene.debugBounds)
+        container.removeChild(scene.debugBounds);
       }
 
       if (scene.debugAnchor.parent === container) {
-        container.removeChild(scene.debugAnchor)
+        container.removeChild(scene.debugAnchor);
       }
-    }
-  }, [app, scene])
+    };
+  }, [app, scene]);
 
-  return <pixiContainer ref={containerRef} />
+  return <pixiContainer ref={containerRef} />;
 }
 
 export function PixiStage({
@@ -68,5 +68,5 @@ export function PixiStage({
     >
       <StageContents scene={scene} />
     </PixiApplication>
-  )
+  );
 }

@@ -1,27 +1,27 @@
-import { BookOpenText, Package } from 'lucide-react'
+import { BookOpenText, Package } from 'lucide-react';
 
-import { CodeBlock } from '../ui/code-block'
+import { CodeBlock } from '../ui/code-block';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog'
-import type { StageBackgroundMode } from './types'
+} from '../ui/dialog';
+import type { StageBackgroundMode } from './types';
 
-const installCommand = 'pnpm add pixi.js @esotericsoftware/spine-pixi-v8'
+const installCommand = 'pnpm add pixi.js @esotericsoftware/spine-pixi-v8';
 
 function getStageClassName(stageBackgroundMode: StageBackgroundMode) {
   if (stageBackgroundMode === 'checkerboard') {
-    return 'bg-[linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06)),linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06))] bg-[length:28px_28px] bg-[position:0_0,14px_14px] bg-[#101826]'
+    return 'bg-[linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06)),linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06))] bg-[length:28px_28px] bg-[position:0_0,14px_14px] bg-[#101826]';
   }
 
   if (stageBackgroundMode === 'transparent') {
-    return 'bg-transparent'
+    return 'bg-transparent';
   }
 
-  return 'bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]'
+  return 'bg-[linear-gradient(180deg,rgba(10,18,32,0.96),rgba(6,10,18,0.98))]';
 }
 
 function getImplementationExample({
@@ -117,7 +117,7 @@ function SpineScene() {
       </Application>
     </div>
   )
-}`
+}`;
 }
 
 export function CodePreviewDialog({
@@ -146,7 +146,7 @@ export function CodePreviewDialog({
     timeScale,
     userScale,
     stageBackgroundMode,
-  })
+  });
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
@@ -207,5 +207,5 @@ export function CodePreviewDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

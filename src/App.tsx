@@ -947,6 +947,7 @@ function App() {
     if (!viewportRef.current || !app) {
       setError('Unable to prepare the Pixi stage.')
       setStatus('Load failed.')
+      setShowWorkspace(false)
       return
     }
 
@@ -1040,6 +1041,7 @@ function App() {
       setUserScale(DEFAULT_USER_SCALE)
       setError(message)
       setStatus('Load failed.')
+      setShowWorkspace(false)
     } finally {
       setLoading(false)
     }

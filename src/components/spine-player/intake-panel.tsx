@@ -36,6 +36,13 @@ export function IntakePanel({
         description="Load your atlas, skeleton binary, and page textures."
       >
         <div className="space-y-4">
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            <p className={error ? 'mt-2 text-sm font-medium text-foreground' : 'text-sm font-medium text-foreground'}>
+              {status}
+            </p>
+          </div>
+
           <FileInputField
             id="all-spine-files"
             label="All Spine files"
@@ -98,11 +105,6 @@ export function IntakePanel({
                 onFilesSelected={onImagesSelected}
               />
             </div>
-          </div>
-
-          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-            <p className="text-sm font-medium text-foreground">{status}</p>
-            {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
           </div>
 
           <Button

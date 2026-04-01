@@ -38,6 +38,8 @@ export function WorkspacePanel({
   viewportRef,
   scene,
   onPixiAppInit,
+  loading,
+  status,
   hasScene,
   loop,
   selectedAnimation,
@@ -74,6 +76,8 @@ export function WorkspacePanel({
   viewportRef: RefObject<HTMLDivElement | null>
   scene: LoadedScene | null
   onPixiAppInit: (app: LoadedScene['app']) => void
+  loading: boolean
+  status: string
   hasScene: boolean
   loop: boolean
   selectedAnimation: string
@@ -140,7 +144,20 @@ export function WorkspacePanel({
             )}
           >
             <PixiStage viewportRef={viewportRef} scene={scene} onAppInit={onPixiAppInit} />
-            {!hasScene ? (
+            {!hasScene && loading ? (
+              <div className="absolute inset-0 grid place-items-center p-6">
+                <div className="max-w-sm rounded-[24px] border border-border/60 bg-background/55 px-6 py-8 text-center backdrop-blur">
+                  <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full border border-border/60 bg-background/70">
+                    <Activity className="size-6 animate-spin text-primary" />
+                  </div>
+                  <p className="text-base font-medium text-foreground">Preparing Spine preview</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {status || 'Loading Spine skeleton...'}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {!hasScene && !loading ? (
               <div className="absolute inset-0 grid place-items-center p-6">
                 <div className="max-w-sm rounded-[24px] border border-border/60 bg-background/45 px-6 py-8 text-center backdrop-blur">
                   <PackageOpen className="mx-auto mb-4 size-8 text-muted-foreground" />

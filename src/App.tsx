@@ -1160,6 +1160,8 @@ function App() {
               pixiAppRef.current = app;
               resolvePixiAppWaiters(app);
             }}
+            loading={loading}
+            status={status}
             hasScene={hasScene}
             loop={loop}
             selectedAnimation={selectedAnimation}

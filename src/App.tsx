@@ -1042,6 +1042,7 @@ function App() {
       setError(message)
       setStatus('Load failed.')
       setShowWorkspace(false)
+      console.error(caughtError);
     } finally {
       setLoading(false)
     }

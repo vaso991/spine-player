@@ -665,12 +665,25 @@ function App() {
   const [sceneInfo, setSceneInfo] = useState<SceneInfo | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pixiAppRef = useRef<Application | null>(null);
+  const pixiAppWaitersRef = useRef<Array<(app: Application | null) => void>>([]);
   const sceneRef = useRef<LoadedScene | null>(null);
+
+  function resolvePixiAppWaiters(app: Application | null) {
+    const waiters = pixiAppWaitersRef.current;
+
+    pixiAppWaitersRef.current = [];
+
+    for (const resolve of waiters) {
+      resolve(app);
+    }
+  }
 
   useEffect(() => {
     return () => {
       destroyScene(sceneRef.current);
       sceneRef.current = null;
+      pixiAppRef.current = null;
+      resolvePixiAppWaiters(null);
     };
   }, []);
 
@@ -696,18 +709,23 @@ function App() {
     );
   }, [spineSize]);
 
-  async function waitForPixiApp(maxFrames = 12) {
-    for (let frame = 0; frame < maxFrames; frame += 1) {
-      if (pixiAppRef.current) {
-        return pixiAppRef.current;
-      }
-
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
+  async function waitForPixiApp(timeoutMs = 4000) {
+    if (pixiAppRef.current) {
+      return pixiAppRef.current;
     }
 
-    return null;
+    return await new Promise<Application | null>((resolve) => {
+      const handleResolve = (app: Application | null) => {
+        window.clearTimeout(timeoutId);
+        resolve(app);
+      };
+      const timeoutId = window.setTimeout(() => {
+        pixiAppWaitersRef.current = pixiAppWaitersRef.current.filter((waiter) => waiter !== handleResolve);
+        resolve(null);
+      }, timeoutMs);
+
+      pixiAppWaitersRef.current.push(handleResolve);
+    });
   }
 
   function updateAnimation(animationName: string, shouldLoop: boolean) {
@@ -901,6 +919,9 @@ function App() {
       sceneRef.current = null;
     }
 
+    pixiAppRef.current = null;
+    resolvePixiAppWaiters(null);
+
     setAnimations([]);
     setAnimationSummaries([]);
     setAtlasInfo(null);
@@ -934,10 +955,8 @@ function App() {
 
   async function handleLoad() {
     if (!showWorkspace) {
+      pixiAppRef.current = null;
       setShowWorkspace(true);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
     }
 
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -1139,6 +1158,7 @@ function App() {
             scene={sceneRef.current}
             onPixiAppInit={(app) => {
               pixiAppRef.current = app;
+              resolvePixiAppWaiters(app);
             }}
             hasScene={hasScene}
             loop={loop}

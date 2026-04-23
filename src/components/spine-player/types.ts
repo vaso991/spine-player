@@ -37,16 +37,70 @@ export type LoadedScene = {
   requestedScale: {
     value: number
   }
-  requestedHue: {
-    value: number
-  }
-  requestedSaturation: {
-    value: number
+  requestedFilters: {
+    value: ColorFilterConfig
   }
   syncSceneMetrics: () => void
   spine: Spine
   animations: string[]
   assetKeys: string[]
+}
+
+export type ColorFilterId =
+  | 'brightness'
+  | 'contrast'
+  | 'grayscale'
+  | 'hue'
+  | 'saturation'
+  | 'tint'
+  | 'blackAndWhite'
+  | 'desaturate'
+  | 'negative'
+  | 'sepia'
+  | 'technicolor'
+  | 'polaroid'
+  | 'toBGR'
+  | 'kodachrome'
+  | 'browni'
+  | 'vintage'
+  | 'colorTone'
+  | 'night'
+  | 'predator'
+  | 'lsd'
+
+export type ColorFilterConfig = {
+  blackAndWhiteEnabled: boolean
+  brightness: number
+  brightnessEnabled: boolean
+  browniEnabled: boolean
+  colorToneDarkColor: string
+  colorToneDesaturation: number
+  colorToneEnabled: boolean
+  colorToneLightColor: string
+  colorToneToned: number
+  contrast: number
+  contrastEnabled: boolean
+  desaturateEnabled: boolean
+  grayscale: number
+  grayscaleEnabled: boolean
+  hue: number
+  hueEnabled: boolean
+  kodachromeEnabled: boolean
+  lsdEnabled: boolean
+  negativeEnabled: boolean
+  nightEnabled: boolean
+  nightIntensity: number
+  polaroidEnabled: boolean
+  predatorAmount: number
+  predatorEnabled: boolean
+  saturation: number
+  saturationEnabled: boolean
+  sepiaEnabled: boolean
+  technicolorEnabled: boolean
+  tint: string
+  tintEnabled: boolean
+  toBGREnabled: boolean
+  vintageEnabled: boolean
 }
 
 export type SpineSize = {

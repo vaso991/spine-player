@@ -21,11 +21,14 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { cn } from '../../lib/utils';
 import { CodePreviewDialog } from './code-preview-dialog';
+import { FilterPanel } from './filter-panel';
 import { PixiStage } from './pixi-stage';
 import { MetricCard, SectionCard, formatPixels, formatPoint } from './shared';
 import type {
   AnimationSummary,
   AtlasInfo,
+  ColorFilterConfig,
+  ColorFilterId,
   LoadedScene,
   PlaybackInfo,
   RenderedSizeRange,
@@ -47,8 +50,7 @@ export function WorkspacePanel({
   isPaused,
   timeScale,
   userScale,
-  hue,
-  saturation,
+  filterConfig,
   defaultScale,
   stageBackgroundMode,
   atlasInfo,
@@ -72,8 +74,9 @@ export function WorkspacePanel({
   onSeekFrame,
   onTimeScaleChange,
   onUserScaleChange,
-  onHueChange,
-  onSaturationChange,
+  onFilterConfigChange,
+  onResetAllFilters,
+  onResetFilter,
   onStageBackgroundModeChange,
   onAnimationSelect,
 }: {
@@ -89,8 +92,7 @@ export function WorkspacePanel({
   isPaused: boolean
   timeScale: number
   userScale: number
-  hue: number
-  saturation: number
+  filterConfig: ColorFilterConfig
   defaultScale: number
   stageBackgroundMode: StageBackgroundMode
   atlasInfo: AtlasInfo | null
@@ -114,8 +116,9 @@ export function WorkspacePanel({
   onSeekFrame: (frame: number) => void
   onTimeScaleChange: (nextValue: number) => void
   onUserScaleChange: (nextValue: number) => void
-  onHueChange: (nextValue: number) => void
-  onSaturationChange: (nextValue: number) => void
+  onFilterConfigChange: (nextConfig: Partial<ColorFilterConfig>) => void
+  onResetAllFilters: () => void
+  onResetFilter: (filterId: ColorFilterId) => void
   onStageBackgroundModeChange: (mode: StageBackgroundMode) => void
   onAnimationSelect: (animationName: string) => void
 }) {
@@ -351,69 +354,15 @@ export function WorkspacePanel({
               </div>
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Hue</p>
-                  <p className="text-xs text-muted-foreground">0 is normal, negative shifts backward, positive shifts forward.</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => onHueChange(0)}>
-                  <TimerReset className="size-3.5" />
-                  Reset
-                </Button>
-              </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
-                <Slider
-                  min={-180}
-                  max={180}
-                  step={1}
-                  value={[hue]}
-                  onValueChange={([nextValue]) => onHueChange(nextValue ?? 0)}
-                />
-                <Input
-                  className="h-10"
-                  type="number"
-                  min="-180"
-                  max="180"
-                  step="1"
-                  value={hue}
-                  onChange={(event) => onHueChange(Number(event.target.value))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Saturation</p>
-                  <p className="text-xs text-muted-foreground">1 is normal, 0 is grayscale, 2 is more vivid.</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => onSaturationChange(1)}>
-                  <TimerReset className="size-3.5" />
-                  Reset
-                </Button>
-              </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-3">
-                <Slider
-                  min={0}
-                  max={3}
-                  step={0.05}
-                  value={[saturation]}
-                  onValueChange={([nextValue]) => onSaturationChange(nextValue ?? 1)}
-                />
-                <Input
-                  className="h-10"
-                  type="number"
-                  min="0"
-                  max="3"
-                  step="0.05"
-                  value={saturation}
-                  onChange={(event) => onSaturationChange(Number(event.target.value))}
-                />
-              </div>
-            </div>
           </div>
         </SectionCard>
+
+        <FilterPanel
+          filterConfig={filterConfig}
+          onFilterConfigChange={onFilterConfigChange}
+          onResetAllFilters={onResetAllFilters}
+          onResetFilter={onResetFilter}
+        />
 
         <SectionCard
           icon={Boxes}
@@ -588,8 +537,7 @@ export function WorkspacePanel({
           isPaused={isPaused}
           timeScale={timeScale}
           userScale={userScale}
-          hue={hue}
-          saturation={saturation}
+          filterConfig={filterConfig}
           stageBackgroundMode={stageBackgroundMode}
         />
       </aside>

@@ -6,6 +6,8 @@ import { WorkspacePanel } from './components/spine-player/workspace-panel';
 import type {
   AnimationSummary,
   AtlasInfo,
+  ColorFilterConfig,
+  ColorFilterId,
   LoadedScene,
   PlaybackInfo,
   RenderedSizeRange,
@@ -21,6 +23,114 @@ const DEFAULT_SATURATION = 1;
 const MIN_HUE = -180;
 const MAX_HUE = 180;
 const MAX_SATURATION = 3;
+const DEFAULT_FILTER_CONFIG: ColorFilterConfig = {
+  blackAndWhiteEnabled: false,
+  brightness: 1,
+  brightnessEnabled: false,
+  browniEnabled: false,
+  colorToneDarkColor: '#338000',
+  colorToneDesaturation: 0.2,
+  colorToneEnabled: false,
+  colorToneLightColor: '#ffe580',
+  colorToneToned: 0.15,
+  contrast: 0,
+  contrastEnabled: false,
+  desaturateEnabled: false,
+  grayscale: 1,
+  grayscaleEnabled: false,
+  hue: DEFAULT_HUE,
+  hueEnabled: false,
+  kodachromeEnabled: false,
+  lsdEnabled: false,
+  negativeEnabled: false,
+  nightEnabled: false,
+  nightIntensity: 0.1,
+  polaroidEnabled: false,
+  predatorAmount: 0.5,
+  predatorEnabled: false,
+  saturation: DEFAULT_SATURATION,
+  saturationEnabled: false,
+  sepiaEnabled: false,
+  technicolorEnabled: false,
+  tint: '#ffffff',
+  tintEnabled: false,
+  toBGREnabled: false,
+  vintageEnabled: false,
+};
+const FILTER_DEFAULTS_BY_ID: Record<ColorFilterId, Partial<ColorFilterConfig>> = {
+  blackAndWhite: {
+    blackAndWhiteEnabled: DEFAULT_FILTER_CONFIG.blackAndWhiteEnabled,
+  },
+  brightness: {
+    brightness: DEFAULT_FILTER_CONFIG.brightness,
+    brightnessEnabled: DEFAULT_FILTER_CONFIG.brightnessEnabled,
+  },
+  browni: {
+    browniEnabled: DEFAULT_FILTER_CONFIG.browniEnabled,
+  },
+  colorTone: {
+    colorToneDarkColor: DEFAULT_FILTER_CONFIG.colorToneDarkColor,
+    colorToneDesaturation: DEFAULT_FILTER_CONFIG.colorToneDesaturation,
+    colorToneEnabled: DEFAULT_FILTER_CONFIG.colorToneEnabled,
+    colorToneLightColor: DEFAULT_FILTER_CONFIG.colorToneLightColor,
+    colorToneToned: DEFAULT_FILTER_CONFIG.colorToneToned,
+  },
+  contrast: {
+    contrast: DEFAULT_FILTER_CONFIG.contrast,
+    contrastEnabled: DEFAULT_FILTER_CONFIG.contrastEnabled,
+  },
+  desaturate: {
+    desaturateEnabled: DEFAULT_FILTER_CONFIG.desaturateEnabled,
+  },
+  grayscale: {
+    grayscale: DEFAULT_FILTER_CONFIG.grayscale,
+    grayscaleEnabled: DEFAULT_FILTER_CONFIG.grayscaleEnabled,
+  },
+  hue: {
+    hue: DEFAULT_FILTER_CONFIG.hue,
+    hueEnabled: DEFAULT_FILTER_CONFIG.hueEnabled,
+  },
+  kodachrome: {
+    kodachromeEnabled: DEFAULT_FILTER_CONFIG.kodachromeEnabled,
+  },
+  lsd: {
+    lsdEnabled: DEFAULT_FILTER_CONFIG.lsdEnabled,
+  },
+  negative: {
+    negativeEnabled: DEFAULT_FILTER_CONFIG.negativeEnabled,
+  },
+  night: {
+    nightEnabled: DEFAULT_FILTER_CONFIG.nightEnabled,
+    nightIntensity: DEFAULT_FILTER_CONFIG.nightIntensity,
+  },
+  polaroid: {
+    polaroidEnabled: DEFAULT_FILTER_CONFIG.polaroidEnabled,
+  },
+  predator: {
+    predatorAmount: DEFAULT_FILTER_CONFIG.predatorAmount,
+    predatorEnabled: DEFAULT_FILTER_CONFIG.predatorEnabled,
+  },
+  saturation: {
+    saturation: DEFAULT_FILTER_CONFIG.saturation,
+    saturationEnabled: DEFAULT_FILTER_CONFIG.saturationEnabled,
+  },
+  sepia: {
+    sepiaEnabled: DEFAULT_FILTER_CONFIG.sepiaEnabled,
+  },
+  technicolor: {
+    technicolorEnabled: DEFAULT_FILTER_CONFIG.technicolorEnabled,
+  },
+  tint: {
+    tint: DEFAULT_FILTER_CONFIG.tint,
+    tintEnabled: DEFAULT_FILTER_CONFIG.tintEnabled,
+  },
+  toBGR: {
+    toBGREnabled: DEFAULT_FILTER_CONFIG.toBGREnabled,
+  },
+  vintage: {
+    vintageEnabled: DEFAULT_FILTER_CONFIG.vintageEnabled,
+  },
+};
 
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file);
@@ -287,24 +397,179 @@ function normalizeHue(value: number) {
   return Number.isFinite(value) ? Math.min(MAX_HUE, Math.max(MIN_HUE, value)) : DEFAULT_HUE;
 }
 
-function applySpineColorAdjustments(
-  spine: Spine,
-  colorMatrixFilter: ColorMatrixFilter,
-  hue = DEFAULT_HUE,
-  saturation = DEFAULT_SATURATION,
-) {
-  const normalizedHue = normalizeHue(hue);
-  const normalizedSaturation = normalizeSaturation(saturation);
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
-  colorMatrixFilter.reset();
-  colorMatrixFilter.hue(normalizedHue, false);
-  colorMatrixFilter.saturate(normalizedSaturation - 1, true);
-  spine.filters = [colorMatrixFilter];
+function normalizeHexColor(value: string, fallback: string) {
+  const normalized = value.trim().toLowerCase();
+  const matched = normalized.match(/^#?([0-9a-f]{6})$/i);
+
+  return matched ? `#${matched[1]}` : fallback;
+}
+
+function normalizeColorFilterConfig(config: Partial<ColorFilterConfig>): ColorFilterConfig {
+  const mergedConfig = { ...DEFAULT_FILTER_CONFIG, ...config };
 
   return {
-    hue: normalizedHue,
-    saturation: normalizedSaturation,
+    blackAndWhiteEnabled: Boolean(mergedConfig.blackAndWhiteEnabled),
+    brightness: Number.isFinite(mergedConfig.brightness) ? clamp(mergedConfig.brightness, 0, 3) : DEFAULT_FILTER_CONFIG.brightness,
+    brightnessEnabled: Boolean(mergedConfig.brightnessEnabled),
+    browniEnabled: Boolean(mergedConfig.browniEnabled),
+    colorToneDarkColor: normalizeHexColor(
+      mergedConfig.colorToneDarkColor,
+      DEFAULT_FILTER_CONFIG.colorToneDarkColor,
+    ),
+    colorToneDesaturation: Number.isFinite(mergedConfig.colorToneDesaturation)
+      ? clamp(mergedConfig.colorToneDesaturation, 0, 1)
+      : DEFAULT_FILTER_CONFIG.colorToneDesaturation,
+    colorToneEnabled: Boolean(mergedConfig.colorToneEnabled),
+    colorToneLightColor: normalizeHexColor(
+      mergedConfig.colorToneLightColor,
+      DEFAULT_FILTER_CONFIG.colorToneLightColor,
+    ),
+    colorToneToned: Number.isFinite(mergedConfig.colorToneToned)
+      ? clamp(mergedConfig.colorToneToned, 0, 1)
+      : DEFAULT_FILTER_CONFIG.colorToneToned,
+    contrast: Number.isFinite(mergedConfig.contrast) ? clamp(mergedConfig.contrast, 0, 1) : DEFAULT_FILTER_CONFIG.contrast,
+    contrastEnabled: Boolean(mergedConfig.contrastEnabled),
+    desaturateEnabled: Boolean(mergedConfig.desaturateEnabled),
+    grayscale: Number.isFinite(mergedConfig.grayscale) ? clamp(mergedConfig.grayscale, 0, 1) : DEFAULT_FILTER_CONFIG.grayscale,
+    grayscaleEnabled: Boolean(mergedConfig.grayscaleEnabled),
+    hue: normalizeHue(mergedConfig.hue),
+    hueEnabled: Boolean(mergedConfig.hueEnabled),
+    kodachromeEnabled: Boolean(mergedConfig.kodachromeEnabled),
+    lsdEnabled: Boolean(mergedConfig.lsdEnabled),
+    negativeEnabled: Boolean(mergedConfig.negativeEnabled),
+    nightEnabled: Boolean(mergedConfig.nightEnabled),
+    nightIntensity: Number.isFinite(mergedConfig.nightIntensity)
+      ? clamp(mergedConfig.nightIntensity, 0, 1)
+      : DEFAULT_FILTER_CONFIG.nightIntensity,
+    polaroidEnabled: Boolean(mergedConfig.polaroidEnabled),
+    predatorAmount: Number.isFinite(mergedConfig.predatorAmount)
+      ? clamp(mergedConfig.predatorAmount, 0, 1)
+      : DEFAULT_FILTER_CONFIG.predatorAmount,
+    predatorEnabled: Boolean(mergedConfig.predatorEnabled),
+    saturation: normalizeSaturation(mergedConfig.saturation),
+    saturationEnabled: Boolean(mergedConfig.saturationEnabled),
+    sepiaEnabled: Boolean(mergedConfig.sepiaEnabled),
+    technicolorEnabled: Boolean(mergedConfig.technicolorEnabled),
+    tint: normalizeHexColor(mergedConfig.tint, DEFAULT_FILTER_CONFIG.tint),
+    tintEnabled: Boolean(mergedConfig.tintEnabled),
+    toBGREnabled: Boolean(mergedConfig.toBGREnabled),
+    vintageEnabled: Boolean(mergedConfig.vintageEnabled),
   };
+}
+
+function applySpineColorFilters(
+  spine: Spine,
+  colorMatrixFilter: ColorMatrixFilter,
+  filterConfig: Partial<ColorFilterConfig>,
+) {
+  const normalizedFilterConfig = normalizeColorFilterConfig(filterConfig);
+  let hasAppliedFilter = false;
+
+  const applyFilter = (runner: (multiply: boolean) => void) => {
+    runner(hasAppliedFilter);
+    hasAppliedFilter = true;
+  };
+
+  colorMatrixFilter.reset();
+  colorMatrixFilter.alpha = 1;
+
+  if (normalizedFilterConfig.brightnessEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.brightness(normalizedFilterConfig.brightness, multiply));
+  }
+
+  if (normalizedFilterConfig.contrastEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.contrast(normalizedFilterConfig.contrast, multiply));
+  }
+
+  if (normalizedFilterConfig.grayscaleEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.grayscale(normalizedFilterConfig.grayscale, multiply));
+  }
+
+  if (normalizedFilterConfig.hueEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.hue(normalizedFilterConfig.hue, multiply));
+  }
+
+  if (normalizedFilterConfig.saturationEnabled) {
+    applyFilter((multiply) =>
+      colorMatrixFilter.saturate(normalizedFilterConfig.saturation - DEFAULT_SATURATION, multiply),
+    );
+  }
+
+  if (normalizedFilterConfig.tintEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.tint(normalizedFilterConfig.tint, multiply));
+  }
+
+  if (normalizedFilterConfig.blackAndWhiteEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.blackAndWhite(multiply));
+  }
+
+  if (normalizedFilterConfig.desaturateEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.saturate(-1, multiply));
+  }
+
+  if (normalizedFilterConfig.negativeEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.negative(multiply));
+  }
+
+  if (normalizedFilterConfig.sepiaEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.sepia(multiply));
+  }
+
+  if (normalizedFilterConfig.technicolorEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.technicolor(multiply));
+  }
+
+  if (normalizedFilterConfig.polaroidEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.polaroid(multiply));
+  }
+
+  if (normalizedFilterConfig.toBGREnabled) {
+    applyFilter((multiply) => colorMatrixFilter.toBGR(multiply));
+  }
+
+  if (normalizedFilterConfig.kodachromeEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.kodachrome(multiply));
+  }
+
+  if (normalizedFilterConfig.browniEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.browni(multiply));
+  }
+
+  if (normalizedFilterConfig.vintageEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.vintage(multiply));
+  }
+
+  if (normalizedFilterConfig.colorToneEnabled) {
+    applyFilter((multiply) =>
+      colorMatrixFilter.colorTone(
+        normalizedFilterConfig.colorToneDesaturation,
+        normalizedFilterConfig.colorToneToned,
+        normalizedFilterConfig.colorToneLightColor,
+        normalizedFilterConfig.colorToneDarkColor,
+        multiply,
+      ),
+    );
+  }
+
+  if (normalizedFilterConfig.nightEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.night(normalizedFilterConfig.nightIntensity, multiply));
+  }
+
+  if (normalizedFilterConfig.predatorEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.predator(normalizedFilterConfig.predatorAmount, multiply));
+  }
+
+  if (normalizedFilterConfig.lsdEnabled) {
+    applyFilter((multiply) => colorMatrixFilter.lsd(multiply));
+  }
+
+  spine.filters = hasAppliedFilter ? [colorMatrixFilter] : [];
+
+  return normalizedFilterConfig;
 }
 
 function drawAnimationBoundsBorder(
@@ -470,8 +735,7 @@ async function loadScene(
   files: SelectedFiles,
   app: Application,
   requestedScale = DEFAULT_USER_SCALE,
-  requestedHue = DEFAULT_HUE,
-  requestedSaturation = DEFAULT_SATURATION,
+  requestedFilters = DEFAULT_FILTER_CONFIG,
   onSizeChange?: (size: SpineSize) => void,
   onFpsChange?: (fps: number) => void,
   onPlaybackChange?: (playback: PlaybackInfo) => void,
@@ -559,17 +823,9 @@ async function loadScene(
       };
     };
     const requestedScaleState = { value: requestedScale };
-    const requestedHueState = { value: DEFAULT_HUE };
-    const requestedSaturationState = { value: DEFAULT_SATURATION };
-    const colorAdjustments = applySpineColorAdjustments(
-      spine,
-      colorMatrixFilter,
-      requestedHue,
-      requestedSaturation,
-    );
-
-    requestedHueState.value = colorAdjustments.hue;
-    requestedSaturationState.value = colorAdjustments.saturation;
+    const requestedFiltersState = {
+      value: applySpineColorFilters(spine, colorMatrixFilter, requestedFilters),
+    };
     const debugEnabledState = { value: true };
     let lastFpsUpdate = 0;
 
@@ -648,9 +904,8 @@ async function loadScene(
       debugBounds,
       handleResize,
       getAnimationLayoutBounds,
-      requestedHue: requestedHueState,
+      requestedFilters: requestedFiltersState,
       requestedScale: requestedScaleState,
-      requestedSaturation: requestedSaturationState,
       syncSceneMetrics,
       spine,
       animations,
@@ -701,8 +956,7 @@ function App() {
   const [showDebugGuides, setShowDebugGuides] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [userScale, setUserScale] = useState(DEFAULT_USER_SCALE);
-  const [hue, setHue] = useState(DEFAULT_HUE);
-  const [saturation, setSaturation] = useState(DEFAULT_SATURATION);
+  const [filterConfig, setFilterConfig] = useState<ColorFilterConfig>(DEFAULT_FILTER_CONFIG);
   const [timeScale, setTimeScale] = useState(1);
   const [stageBackgroundMode, setStageBackgroundMode] = useState<StageBackgroundMode>('checkerboard');
   const [loading, setLoading] = useState(false);
@@ -940,46 +1194,33 @@ function App() {
     );
   }
 
-  function updateHue(nextHue: number) {
+  function updateFilterConfig(nextConfig: Partial<ColorFilterConfig>) {
     const scene = sceneRef.current;
-    const normalizedHue = normalizeHue(nextHue);
 
-    setHue(normalizedHue);
+    setFilterConfig((currentConfig) => {
+      const normalizedFilterConfig = normalizeColorFilterConfig({
+        ...currentConfig,
+        ...nextConfig,
+      });
 
-    if (!scene) {
-      return;
-    }
+      if (scene) {
+        scene.requestedFilters.value = applySpineColorFilters(
+          scene.spine,
+          scene.colorMatrixFilter,
+          normalizedFilterConfig,
+        );
+      }
 
-    const colorAdjustments = applySpineColorAdjustments(
-      scene.spine,
-      scene.colorMatrixFilter,
-      normalizedHue,
-      scene.requestedSaturation.value,
-    );
-
-    scene.requestedHue.value = colorAdjustments.hue;
-    scene.requestedSaturation.value = colorAdjustments.saturation;
+      return normalizedFilterConfig;
+    });
   }
 
-  function updateSaturation(nextSaturation: number) {
-    const scene = sceneRef.current;
-    const normalizedSaturation = normalizeSaturation(nextSaturation);
+  function resetFilter(filterId: ColorFilterId) {
+    updateFilterConfig(FILTER_DEFAULTS_BY_ID[filterId]);
+  }
 
-    setSaturation(normalizedSaturation);
-
-    if (!scene) {
-      return;
-    }
-
-    const colorAdjustments = applySpineColorAdjustments(
-      scene.spine,
-      scene.colorMatrixFilter,
-      scene.requestedHue.value,
-      normalizedSaturation,
-    );
-
-    scene.requestedHue.value = colorAdjustments.hue;
-    scene.requestedSaturation.value = colorAdjustments.saturation;
+  function resetAllFilters() {
+    updateFilterConfig(DEFAULT_FILTER_CONFIG);
   }
 
   function updateDebugGuides(nextValue: boolean) {
@@ -1032,6 +1273,7 @@ function App() {
     setStatus('Upload Spine files and press Load demo.');
     setShowDebugGuides(true);
     setIsPaused(false);
+    setFilterConfig(DEFAULT_FILTER_CONFIG);
     setUserScale(DEFAULT_USER_SCALE);
   }
 
@@ -1071,6 +1313,7 @@ function App() {
     setStatus('Loading Spine skeleton...');
 
     const previousScene = sceneRef.current;
+    const nextFilterConfig = previousScene ? DEFAULT_FILTER_CONFIG : filterConfig;
 
     if (previousScene) {
       destroyScene(previousScene);
@@ -1084,6 +1327,7 @@ function App() {
       setSceneInfo(null);
       setShowDebugGuides(true);
       setIsPaused(false);
+      setFilterConfig(DEFAULT_FILTER_CONFIG);
       setUserScale(DEFAULT_USER_SCALE);
     }
 
@@ -1092,8 +1336,7 @@ function App() {
         files,
         app,
         files.atlas ? parseAtlasInfo(await files.atlas.text())?.scale ?? DEFAULT_USER_SCALE : DEFAULT_USER_SCALE,
-        hue,
-        saturation,
+        nextFilterConfig,
         setSpineSize,
         setFps,
         setPlaybackInfo,
@@ -1108,6 +1351,7 @@ function App() {
       setHasScene(true);
       setRenderedSizeRange(null);
       setAnimations(scene.animations);
+      setFilterConfig(scene.requestedFilters.value);
       setSelectedAnimation(firstAnimation);
       setUserScale(nextUserScale);
       setSceneInfo({
@@ -1154,6 +1398,7 @@ function App() {
       setSceneInfo(null);
       setShowDebugGuides(true);
       setIsPaused(false);
+      setFilterConfig(DEFAULT_FILTER_CONFIG);
       setSpineSize(null);
       setUserScale(DEFAULT_USER_SCALE);
       setError(message);
@@ -1267,8 +1512,7 @@ function App() {
             isPaused={isPaused}
             timeScale={timeScale}
             userScale={userScale}
-            hue={hue}
-            saturation={saturation}
+            filterConfig={filterConfig}
             defaultScale={defaultScale}
             stageBackgroundMode={stageBackgroundMode}
             atlasInfo={atlasInfo}
@@ -1295,8 +1539,9 @@ function App() {
             onSeekFrame={seekFrame}
             onTimeScaleChange={updateTimeScale}
             onUserScaleChange={updateUserScale}
-            onHueChange={updateHue}
-            onSaturationChange={updateSaturation}
+            onFilterConfigChange={updateFilterConfig}
+            onResetAllFilters={resetAllFilters}
+            onResetFilter={resetFilter}
             onStageBackgroundModeChange={setStageBackgroundMode}
             onAnimationSelect={(animationName) => updateAnimation(animationName, loop)}
           />

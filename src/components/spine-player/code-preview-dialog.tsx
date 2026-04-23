@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import type { StageBackgroundMode } from './types';
+import type { ColorFilterConfig, StageBackgroundMode } from './types';
 
 const installCommand = 'pnpm add pixi.js @esotericsoftware/spine-pixi-v8';
 
@@ -30,8 +30,7 @@ function getImplementationExample({
   isPaused,
   timeScale,
   userScale,
-  hue,
-  saturation,
+  filterConfig,
   stageBackgroundMode,
 }: {
   selectedAnimation: string
@@ -39,10 +38,11 @@ function getImplementationExample({
   isPaused: boolean
   timeScale: number
   userScale: number
-  hue: number
-  saturation: number
+  filterConfig: ColorFilterConfig
   stageBackgroundMode: StageBackgroundMode
 }) {
+  const filterConfigJson = JSON.stringify(filterConfig, null, 2);
+
   return `import { useEffect, useState } from 'react'
 import { Application, extend, useApplication, useExtend } from '@pixi/react'
 import { Assets, ColorMatrixFilter, Container } from 'pixi.js'
@@ -54,12 +54,55 @@ const playback = {
   isPaused: ${isPaused},
   timeScale: ${timeScale},
   userScale: ${userScale},
-  hue: ${hue},
-  saturation: ${saturation},
   stageBackgroundMode: '${stageBackgroundMode}',
 }
 
+const colorFilters = ${filterConfigJson}
+
 extend({ Spine })
+
+function applyColorFilters(colorMatrix: ColorMatrixFilter, filters: typeof colorFilters) {
+  let hasApplied = false
+  const apply = (runner: (multiply: boolean) => void) => {
+    runner(hasApplied)
+    hasApplied = true
+  }
+
+  colorMatrix.reset()
+
+  if (filters.brightnessEnabled) apply((multiply) => colorMatrix.brightness(filters.brightness, multiply))
+  if (filters.contrastEnabled) apply((multiply) => colorMatrix.contrast(filters.contrast, multiply))
+  if (filters.grayscaleEnabled) apply((multiply) => colorMatrix.grayscale(filters.grayscale, multiply))
+  if (filters.hueEnabled) apply((multiply) => colorMatrix.hue(filters.hue, multiply))
+  if (filters.saturationEnabled) apply((multiply) => colorMatrix.saturate(filters.saturation - 1, multiply))
+  if (filters.tintEnabled) apply((multiply) => colorMatrix.tint(filters.tint, multiply))
+  if (filters.blackAndWhiteEnabled) apply((multiply) => colorMatrix.blackAndWhite(multiply))
+  if (filters.desaturateEnabled) apply((multiply) => colorMatrix.saturate(-1, multiply))
+  if (filters.negativeEnabled) apply((multiply) => colorMatrix.negative(multiply))
+  if (filters.sepiaEnabled) apply((multiply) => colorMatrix.sepia(multiply))
+  if (filters.technicolorEnabled) apply((multiply) => colorMatrix.technicolor(multiply))
+  if (filters.polaroidEnabled) apply((multiply) => colorMatrix.polaroid(multiply))
+  if (filters.toBGREnabled) apply((multiply) => colorMatrix.toBGR(multiply))
+  if (filters.kodachromeEnabled) apply((multiply) => colorMatrix.kodachrome(multiply))
+  if (filters.browniEnabled) apply((multiply) => colorMatrix.browni(multiply))
+  if (filters.vintageEnabled) apply((multiply) => colorMatrix.vintage(multiply))
+  if (filters.colorToneEnabled) {
+    apply((multiply) =>
+      colorMatrix.colorTone(
+        filters.colorToneDesaturation,
+        filters.colorToneToned,
+        filters.colorToneLightColor,
+        filters.colorToneDarkColor,
+        multiply,
+      ),
+    )
+  }
+  if (filters.nightEnabled) apply((multiply) => colorMatrix.night(filters.nightIntensity, multiply))
+  if (filters.predatorEnabled) apply((multiply) => colorMatrix.predator(filters.predatorAmount, multiply))
+  if (filters.lsdEnabled) apply((multiply) => colorMatrix.lsd(multiply))
+
+  return hasApplied ? [colorMatrix] : []
+}
 
 function SpineScene() {
   useExtend({ Container })
@@ -100,9 +143,7 @@ function SpineScene() {
       nextSpine.scale.set(playback.userScale)
 
       const colorMatrix = new ColorMatrixFilter()
-      colorMatrix.hue(playback.hue, false)
-      colorMatrix.saturate(playback.saturation - 1, true)
-      nextSpine.filters = [colorMatrix]
+      nextSpine.filters = applyColorFilters(colorMatrix, colorFilters)
 
       setSpine(nextSpine)
     }
@@ -139,8 +180,7 @@ export function CodePreviewDialog({
   isPaused,
   timeScale,
   userScale,
-  hue,
-  saturation,
+  filterConfig,
   stageBackgroundMode,
 }: {
   open: boolean
@@ -150,8 +190,7 @@ export function CodePreviewDialog({
   isPaused: boolean
   timeScale: number
   userScale: number
-  hue: number
-  saturation: number
+  filterConfig: ColorFilterConfig
   stageBackgroundMode: StageBackgroundMode
 }) {
   const implementationExample = getImplementationExample({
@@ -160,10 +199,31 @@ export function CodePreviewDialog({
     isPaused,
     timeScale,
     userScale,
-    hue,
-    saturation,
+    filterConfig,
     stageBackgroundMode,
   });
+  const activeFilters = [
+    filterConfig.blackAndWhiteEnabled ? 'Black & White' : null,
+    filterConfig.brightnessEnabled ? 'Brightness' : null,
+    filterConfig.browniEnabled ? 'Browni' : null,
+    filterConfig.colorToneEnabled ? 'Color Tone' : null,
+    filterConfig.contrastEnabled ? 'Contrast' : null,
+    filterConfig.desaturateEnabled ? 'Desaturate' : null,
+    filterConfig.grayscaleEnabled ? 'Grayscale' : null,
+    filterConfig.hueEnabled ? 'Hue' : null,
+    filterConfig.kodachromeEnabled ? 'Kodachrome' : null,
+    filterConfig.lsdEnabled ? 'LSD' : null,
+    filterConfig.negativeEnabled ? 'Negative' : null,
+    filterConfig.nightEnabled ? 'Night' : null,
+    filterConfig.polaroidEnabled ? 'Polaroid' : null,
+    filterConfig.predatorEnabled ? 'Predator' : null,
+    filterConfig.saturationEnabled ? 'Saturation' : null,
+    filterConfig.sepiaEnabled ? 'Sepia' : null,
+    filterConfig.technicolorEnabled ? 'Technicolor' : null,
+    filterConfig.tintEnabled ? 'Tint' : null,
+    filterConfig.toBGREnabled ? 'To BGR' : null,
+    filterConfig.vintageEnabled ? 'Vintage' : null,
+  ].filter(Boolean);
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
@@ -210,8 +270,7 @@ export function CodePreviewDialog({
               <p>Paused: {isPaused ? 'true' : 'false'}</p>
               <p>Time scale: {timeScale}</p>
               <p>User scale: {userScale}</p>
-              <p>Hue: {hue}</p>
-              <p>Saturation: {saturation}</p>
+              <p>Active filters: {activeFilters.length > 0 ? activeFilters.join(', ') : 'None'}</p>
               <p>Stage mode: {stageBackgroundMode}</p>
             </div>
           </div>

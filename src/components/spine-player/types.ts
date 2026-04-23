@@ -1,4 +1,4 @@
-import type { Application, Graphics } from 'pixi.js';
+import type { Application, ColorMatrixFilter, Graphics } from 'pixi.js';
 import type { Spine } from '@esotericsoftware/spine-pixi-v8';
 
 export type SelectedFiles = {
@@ -24,6 +24,7 @@ export type LoadedScene = {
   app: Application
   animationSummaries: AnimationSummary[]
   atlasInfo: AtlasInfo | null
+  colorMatrixFilter: ColorMatrixFilter
   debugEnabled: {
     value: boolean
   }
@@ -34,6 +35,12 @@ export type LoadedScene = {
     animationName: string,
   ) => { x: number; y: number; width: number; height: number } | null
   requestedScale: {
+    value: number
+  }
+  requestedHue: {
+    value: number
+  }
+  requestedSaturation: {
     value: number
   }
   syncSceneMetrics: () => void

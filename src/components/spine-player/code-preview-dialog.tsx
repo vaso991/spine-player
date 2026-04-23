@@ -30,6 +30,8 @@ function getImplementationExample({
   isPaused,
   timeScale,
   userScale,
+  hue,
+  saturation,
   stageBackgroundMode,
 }: {
   selectedAnimation: string
@@ -37,11 +39,13 @@ function getImplementationExample({
   isPaused: boolean
   timeScale: number
   userScale: number
+  hue: number
+  saturation: number
   stageBackgroundMode: StageBackgroundMode
 }) {
   return `import { useEffect, useState } from 'react'
 import { Application, extend, useApplication, useExtend } from '@pixi/react'
-import { Assets, Container } from 'pixi.js'
+import { Assets, ColorMatrixFilter, Container } from 'pixi.js'
 import { Spine } from '@esotericsoftware/spine-pixi-v8'
 
 const playback = {
@@ -50,6 +54,8 @@ const playback = {
   isPaused: ${isPaused},
   timeScale: ${timeScale},
   userScale: ${userScale},
+  hue: ${hue},
+  saturation: ${saturation},
   stageBackgroundMode: '${stageBackgroundMode}',
 }
 
@@ -93,6 +99,11 @@ function SpineScene() {
       nextSpine.position.set(app.screen.width * 0.5, app.screen.height * 0.8)
       nextSpine.scale.set(playback.userScale)
 
+      const colorMatrix = new ColorMatrixFilter()
+      colorMatrix.hue(playback.hue, false)
+      colorMatrix.saturate(playback.saturation - 1, true)
+      nextSpine.filters = [colorMatrix]
+
       setSpine(nextSpine)
     }
 
@@ -128,6 +139,8 @@ export function CodePreviewDialog({
   isPaused,
   timeScale,
   userScale,
+  hue,
+  saturation,
   stageBackgroundMode,
 }: {
   open: boolean
@@ -137,6 +150,8 @@ export function CodePreviewDialog({
   isPaused: boolean
   timeScale: number
   userScale: number
+  hue: number
+  saturation: number
   stageBackgroundMode: StageBackgroundMode
 }) {
   const implementationExample = getImplementationExample({
@@ -145,6 +160,8 @@ export function CodePreviewDialog({
     isPaused,
     timeScale,
     userScale,
+    hue,
+    saturation,
     stageBackgroundMode,
   });
 
@@ -193,6 +210,8 @@ export function CodePreviewDialog({
               <p>Paused: {isPaused ? 'true' : 'false'}</p>
               <p>Time scale: {timeScale}</p>
               <p>User scale: {userScale}</p>
+              <p>Hue: {hue}</p>
+              <p>Saturation: {saturation}</p>
               <p>Stage mode: {stageBackgroundMode}</p>
             </div>
           </div>

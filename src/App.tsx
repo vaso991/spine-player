@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Assets, Graphics, ImageSource, type Application } from 'pixi.js';
+import { Assets, ColorMatrixFilter, Graphics, ImageSource, type Application } from 'pixi.js';
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8';
 import { IntakePanel } from './components/spine-player/intake-panel';
 import { WorkspacePanel } from './components/spine-player/workspace-panel';
@@ -16,6 +16,11 @@ import type {
 } from './components/spine-player/types';
 
 const DEFAULT_USER_SCALE = 1;
+const DEFAULT_HUE = 0;
+const DEFAULT_SATURATION = 1;
+const MIN_HUE = -180;
+const MAX_HUE = 180;
+const MAX_SATURATION = 3;
 
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file);
@@ -274,6 +279,34 @@ function getDisplayedScale(
   return normalizedRequestedScale;
 }
 
+function normalizeSaturation(value: number) {
+  return Number.isFinite(value) ? Math.min(MAX_SATURATION, Math.max(0, value)) : DEFAULT_SATURATION;
+}
+
+function normalizeHue(value: number) {
+  return Number.isFinite(value) ? Math.min(MAX_HUE, Math.max(MIN_HUE, value)) : DEFAULT_HUE;
+}
+
+function applySpineColorAdjustments(
+  spine: Spine,
+  colorMatrixFilter: ColorMatrixFilter,
+  hue = DEFAULT_HUE,
+  saturation = DEFAULT_SATURATION,
+) {
+  const normalizedHue = normalizeHue(hue);
+  const normalizedSaturation = normalizeSaturation(saturation);
+
+  colorMatrixFilter.reset();
+  colorMatrixFilter.hue(normalizedHue, false);
+  colorMatrixFilter.saturate(normalizedSaturation - 1, true);
+  spine.filters = [colorMatrixFilter];
+
+  return {
+    hue: normalizedHue,
+    saturation: normalizedSaturation,
+  };
+}
+
 function drawAnimationBoundsBorder(
   debugBounds: Graphics | null,
   bounds: { x: number; y: number; width: number; height: number },
@@ -437,6 +470,8 @@ async function loadScene(
   files: SelectedFiles,
   app: Application,
   requestedScale = DEFAULT_USER_SCALE,
+  requestedHue = DEFAULT_HUE,
+  requestedSaturation = DEFAULT_SATURATION,
   onSizeChange?: (size: SpineSize) => void,
   onFpsChange?: (fps: number) => void,
   onPlaybackChange?: (playback: PlaybackInfo) => void,
@@ -507,6 +542,7 @@ async function loadScene(
     });
     const debugAnchor = new Graphics();
     const debugBounds = new Graphics();
+    const colorMatrixFilter = new ColorMatrixFilter();
     const animationSummaries = computeAnimationSummaries(spine);
     const getAnimationLayoutBounds = (animationName: string) => {
       const summary = animationSummaries.find((item) => item.name === animationName);
@@ -523,6 +559,17 @@ async function loadScene(
       };
     };
     const requestedScaleState = { value: requestedScale };
+    const requestedHueState = { value: DEFAULT_HUE };
+    const requestedSaturationState = { value: DEFAULT_SATURATION };
+    const colorAdjustments = applySpineColorAdjustments(
+      spine,
+      colorMatrixFilter,
+      requestedHue,
+      requestedSaturation,
+    );
+
+    requestedHueState.value = colorAdjustments.hue;
+    requestedSaturationState.value = colorAdjustments.saturation;
     const debugEnabledState = { value: true };
     let lastFpsUpdate = 0;
 
@@ -595,12 +642,15 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      colorMatrixFilter,
       debugEnabled: debugEnabledState,
       debugAnchor,
       debugBounds,
       handleResize,
       getAnimationLayoutBounds,
+      requestedHue: requestedHueState,
       requestedScale: requestedScaleState,
+      requestedSaturation: requestedSaturationState,
       syncSceneMetrics,
       spine,
       animations,
@@ -629,6 +679,8 @@ function destroyScene(scene: LoadedScene | null) {
   scene.debugBounds.parent?.removeChild(scene.debugBounds);
   scene.debugBounds.destroy();
   scene.spine.parent?.removeChild(scene.spine);
+  scene.spine.filters = [];
+  scene.colorMatrixFilter.destroy();
   scene.spine.destroy();
 
   for (const assetKey of scene.assetKeys) {
@@ -649,6 +701,8 @@ function App() {
   const [showDebugGuides, setShowDebugGuides] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [userScale, setUserScale] = useState(DEFAULT_USER_SCALE);
+  const [hue, setHue] = useState(DEFAULT_HUE);
+  const [saturation, setSaturation] = useState(DEFAULT_SATURATION);
   const [timeScale, setTimeScale] = useState(1);
   const [stageBackgroundMode, setStageBackgroundMode] = useState<StageBackgroundMode>('checkerboard');
   const [loading, setLoading] = useState(false);
@@ -886,6 +940,48 @@ function App() {
     );
   }
 
+  function updateHue(nextHue: number) {
+    const scene = sceneRef.current;
+    const normalizedHue = normalizeHue(nextHue);
+
+    setHue(normalizedHue);
+
+    if (!scene) {
+      return;
+    }
+
+    const colorAdjustments = applySpineColorAdjustments(
+      scene.spine,
+      scene.colorMatrixFilter,
+      normalizedHue,
+      scene.requestedSaturation.value,
+    );
+
+    scene.requestedHue.value = colorAdjustments.hue;
+    scene.requestedSaturation.value = colorAdjustments.saturation;
+  }
+
+  function updateSaturation(nextSaturation: number) {
+    const scene = sceneRef.current;
+    const normalizedSaturation = normalizeSaturation(nextSaturation);
+
+    setSaturation(normalizedSaturation);
+
+    if (!scene) {
+      return;
+    }
+
+    const colorAdjustments = applySpineColorAdjustments(
+      scene.spine,
+      scene.colorMatrixFilter,
+      scene.requestedHue.value,
+      normalizedSaturation,
+    );
+
+    scene.requestedHue.value = colorAdjustments.hue;
+    scene.requestedSaturation.value = colorAdjustments.saturation;
+  }
+
   function updateDebugGuides(nextValue: boolean) {
     const scene = sceneRef.current;
 
@@ -996,6 +1092,8 @@ function App() {
         files,
         app,
         files.atlas ? parseAtlasInfo(await files.atlas.text())?.scale ?? DEFAULT_USER_SCALE : DEFAULT_USER_SCALE,
+        hue,
+        saturation,
         setSpineSize,
         setFps,
         setPlaybackInfo,
@@ -1169,6 +1267,8 @@ function App() {
             isPaused={isPaused}
             timeScale={timeScale}
             userScale={userScale}
+            hue={hue}
+            saturation={saturation}
             defaultScale={defaultScale}
             stageBackgroundMode={stageBackgroundMode}
             atlasInfo={atlasInfo}
@@ -1195,6 +1295,8 @@ function App() {
             onSeekFrame={seekFrame}
             onTimeScaleChange={updateTimeScale}
             onUserScaleChange={updateUserScale}
+            onHueChange={updateHue}
+            onSaturationChange={updateSaturation}
             onStageBackgroundModeChange={setStageBackgroundMode}
             onAnimationSelect={(animationName) => updateAnimation(animationName, loop)}
           />

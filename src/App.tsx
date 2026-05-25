@@ -1168,6 +1168,31 @@ function App() {
     setPlaybackInfo(computePlaybackInfo(scene.spine));
   }
 
+  function seekTime(time: number) {
+    const scene = sceneRef.current;
+
+    if (!scene) {
+      return;
+    }
+
+    const entry = scene.spine.state.getCurrent(0);
+
+    if (!entry || !entry.animation) {
+      return;
+    }
+
+    const duration = Math.max(entry.animationEnd - entry.animationStart, entry.animation.duration, 0);
+    const nextTrackTime = Number.isFinite(time) ? time : 0;
+
+    setIsPaused(true);
+    scene.spine.state.timeScale = 0;
+    entry.trackTime = duration > 0 ? Math.min(duration, Math.max(0, nextTrackTime)) : 0;
+    scene.spine.state.apply(scene.spine.skeleton);
+    scene.spine.skeleton.updateWorldTransform(Physics.update);
+    scene.syncSceneMetrics();
+    setPlaybackInfo(computePlaybackInfo(scene.spine));
+  }
+
   function updateUserScale(nextScale: number) {
     const scene = sceneRef.current;
     const normalizedScale = Number.isFinite(nextScale) && nextScale > 0 ? nextScale : DEFAULT_USER_SCALE;
@@ -1537,6 +1562,7 @@ function App() {
             onRestart={restartAnimation}
             onStepFrame={stepFrame}
             onSeekFrame={seekFrame}
+            onSeekTime={seekTime}
             onTimeScaleChange={updateTimeScale}
             onUserScaleChange={updateUserScale}
             onFilterConfigChange={updateFilterConfig}

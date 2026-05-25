@@ -72,6 +72,7 @@ export function WorkspacePanel({
   onRestart,
   onStepFrame,
   onSeekFrame,
+  onSeekTime,
   onTimeScaleChange,
   onUserScaleChange,
   onFilterConfigChange,
@@ -114,6 +115,7 @@ export function WorkspacePanel({
   onRestart: () => void
   onStepFrame: (direction: -1 | 1) => void
   onSeekFrame: (frame: number) => void
+  onSeekTime: (time: number) => void
   onTimeScaleChange: (nextValue: number) => void
   onUserScaleChange: (nextValue: number) => void
   onFilterConfigChange: (nextConfig: Partial<ColorFilterConfig>) => void
@@ -132,6 +134,9 @@ export function WorkspacePanel({
     playbackInfo && dopesheetFps && dopesheetFps > 0
       ? Math.max(1, Math.round(playbackInfo.duration * dopesheetFps))
       : null;
+  const currentTime = playbackInfo ? Math.max(0, playbackInfo.currentTime) : null;
+  const totalTime = playbackInfo ? Math.max(0, playbackInfo.duration) : null;
+  const formatTime = (value: number) => `${value.toFixed(2)}s`;
   const stageBackgroundClass =
     stageBackgroundMode === 'checkerboard'
       ? 'bg-[linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06)),linear-gradient(45deg,rgba(255,255,255,0.06)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.06)_75%,rgba(255,255,255,0.06))] bg-[length:28px_28px] bg-[position:0_0,14px_14px] bg-[#101826]'
@@ -240,6 +245,25 @@ export function WorkspacePanel({
                 value={[currentFrame ?? 0]}
                 onValueChange={([nextValue]) => onSeekFrame(nextValue ?? 0)}
               />
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Time selector</p>
+                    <p className="text-xs text-muted-foreground">Jump directly to a time on the active track.</p>
+                  </div>
+                  <div className="text-sm font-medium text-foreground">
+                    {currentTime !== null && totalTime !== null ? `${formatTime(currentTime)} / ${formatTime(totalTime)}` : 'N/A'}
+                  </div>
+                </div>
+                <Slider
+                  min={0}
+                  max={totalTime ?? 0}
+                  step={0.01}
+                  disabled={currentTime === null || totalTime === null || totalTime <= 0}
+                  value={[currentTime ?? 0]}
+                  onValueChange={([nextValue]) => onSeekTime(nextValue ?? 0)}
+                />
+              </div>
             </div>
 
             <div className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4">

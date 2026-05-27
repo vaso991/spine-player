@@ -130,7 +130,7 @@ function SpineScene() {
         return
       }
 
-      const nextSpine = new Spine({
+      const nextSpine = Spine.from({
         skeleton: 'heroData',
         atlas: 'heroAtlas',
         autoUpdate: true,

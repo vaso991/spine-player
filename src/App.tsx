@@ -306,7 +306,7 @@ function getSpineBounds(spine: Spine) {
 }
 
 function computePlaybackInfo(spine: Spine): PlaybackInfo {
-  const entry = spine.state.getTrack(0);
+  const entry = spine.state.getCurrent(0);
 
   if (!entry || !entry.animation) {
     return {
@@ -342,10 +342,10 @@ function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
       const sampleTime = duration > 0 ? (duration * sampleIndex) / sampleCount : 0;
 
       spine.state.clearTracks();
-      spine.skeleton.setupPose();
+      spine.skeleton.setToSetupPose();
       spine.state.setAnimation(0, animation.name, false);
 
-      const entry = spine.state.getTrack(0);
+      const entry = spine.state.getCurrent(0);
 
       if (!entry) {
         continue;
@@ -830,7 +830,7 @@ async function loadScene(
     let lastFpsUpdate = 0;
 
     const syncSceneMetrics = () => {
-      const activeAnimation = spine.state.getTrack(0)?.animation?.name ?? '';
+      const activeAnimation = spine.state.getCurrent(0)?.animation?.name ?? '';
 
       onSizeChange?.(
         updateSpineLayout(
@@ -886,7 +886,7 @@ async function loadScene(
           debugBounds,
           debugAnchor,
           debugEnabledState.value,
-          getAnimationLayoutBounds(spine.state.getTrack(0)?.animation?.name ?? ''),
+          getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
         ),
       );
     };
@@ -1110,7 +1110,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getTrack(0);
+    const entry = scene.spine.state.getCurrent(0);
 
     if (!entry || !entry.animation) {
       return;
@@ -1147,7 +1147,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getTrack(0);
+    const entry = scene.spine.state.getCurrent(0);
 
     if (!entry || !entry.animation) {
       return;
@@ -1175,7 +1175,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getTrack(0);
+    const entry = scene.spine.state.getCurrent(0);
 
     if (!entry || !entry.animation) {
       return;
@@ -1389,7 +1389,11 @@ function App() {
           0,
         ),
         boneCount: scene.spine.skeleton.data.bones.length,
-        constraintCount: scene.spine.skeleton.data.constraints.length,
+        constraintCount:
+          scene.spine.skeleton.data.ikConstraints.length +
+          scene.spine.skeleton.data.transformConstraints.length +
+          scene.spine.skeleton.data.pathConstraints.length +
+          scene.spine.skeleton.data.physicsConstraints.length,
         dopesheetFps: scene.spine.skeleton.data.fps > 0 ? scene.spine.skeleton.data.fps : null,
         eventCount: scene.spine.skeleton.data.events.length,
         skinCount: scene.spine.skeleton.data.skins.length,

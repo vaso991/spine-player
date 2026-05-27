@@ -258,7 +258,7 @@ export function CodePreviewDialog({
 
             <div className="rounded-[24px] border border-border/60 bg-background/40 p-4 text-sm leading-6 text-muted-foreground">
               <p className="font-medium text-foreground">Asset structure</p>
-              <p className="mt-2">Keep the exported `.atlas`, `.skel`, and referenced `.png` pages together.</p>
+              <p className="mt-2">Keep the exported `.atlas`, `.skel`, and referenced `.png`/`.webp` pages together.</p>
               <p className="mt-2">The atlas tells Pixi which texture pages the Spine runtime should bind.</p>
               <p className="mt-2">After loading, use `state.setAnimation()` to start an animation track.</p>
             </div>

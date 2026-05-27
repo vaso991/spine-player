@@ -287,7 +287,7 @@ function classifyFiles(fileList: FileList | File[]) {
       continue;
     }
 
-    if (lowerName.endsWith('.png')) {
+    if (lowerName.endsWith('.png') || lowerName.endsWith('.webp')) {
       images.push(file);
     }
   }
@@ -741,7 +741,7 @@ async function loadScene(
   onPlaybackChange?: (playback: PlaybackInfo) => void,
 ): Promise<LoadedScene> {
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
-    throw new Error('Select an .atlas, a .skel skeleton, and at least one .png image.');
+    throw new Error('Select an .atlas, a .skel skeleton, and at least one .png or .webp image.');
   }
 
   const tempUrls: string[] = [];
@@ -776,7 +776,7 @@ async function loadScene(
       for (const pageName of atlasPageNames) {
         if (!pageTextures[pageName]) {
           throw new Error(
-            `Missing PNG for atlas page "${pageName}". Upload the exact image referenced by the atlas.`,
+            `Missing image for atlas page "${pageName}". Upload the exact .png or .webp referenced by the atlas.`,
           );
         }
       }

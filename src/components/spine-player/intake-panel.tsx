@@ -46,7 +46,7 @@ export function IntakePanel({
           <FileInputField
             id="all-spine-files"
             label="All Spine files"
-            accept=".atlas,.skel,.png,text/plain,application/octet-stream,image/png"
+            accept=".atlas,.skel,.png,.webp,text/plain,application/octet-stream,image/png,image/webp"
             multiple
             filesLabel={[
               files.atlas?.name,
@@ -55,7 +55,7 @@ export function IntakePanel({
             ]
               .filter(Boolean)
               .join(', ') || 'No files selected'}
-            hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`, and `.png`."
+            hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`, and `.png`/`.webp`."
             onFilesSelected={onApplyCombinedFiles}
           />
 
@@ -93,14 +93,14 @@ export function IntakePanel({
 
               <FileInputField
                 id="atlas-images"
-                label="Atlas PNG pages"
-                accept=".png,image/png"
+                label="Atlas image pages"
+                accept=".png,.webp,image/png,image/webp"
                 multiple
                 mode="compact"
                 filesLabel={
                   files.images.length > 0
                     ? files.images.map((file) => file.name).join(', ')
-                    : 'No PNG selected'
+                    : 'No image selected'
                 }
                 onFilesSelected={onImagesSelected}
               />

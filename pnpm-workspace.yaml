@@ -1,0 +1,9 @@
+# spine-pixi-v8 imports @esotericsoftware/spine-core without declaring it, so pin the matching core
+# per runtime. Without this the 4.3 runtime resolves the hoisted 4.2 core.
+packageExtensions:
+  "@esotericsoftware/spine-pixi-v8@4.2":
+    dependencies:
+      "@esotericsoftware/spine-core": "~4.2.0"
+  "@esotericsoftware/spine-pixi-v8@4.3":
+    dependencies:
+      "@esotericsoftware/spine-core": "~4.3.0"

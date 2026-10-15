@@ -4,13 +4,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-WbPSMhJ0OoqSeM1iVzlnrfBb4VIt+hwojrCJx7PlKlg=
+
 importers:
 
   .:
     dependencies:
-      '@esotericsoftware/spine-pixi-v8':
-        specifier: ~4.2.108
-        version: 4.2.108(pixi.js@8.17.1)
       '@fontsource-variable/geist':
         specifier: ^5.2.8
         version: 5.2.8
@@ -44,6 +43,12 @@ importers:
       shadcn:
         specifier: ^4.1.1
         version: 4.1.1(@types/node@24.12.0)(typescript@5.9.3)
+      spine-pixi-v8-4-2:
+        specifier: npm:@esotericsoftware/spine-pixi-v8@~4.2.120
+        version: '@esotericsoftware/spine-pixi-v8@4.2.120(pixi.js@8.17.1)'
+      spine-pixi-v8-4-3:
+        specifier: npm:@esotericsoftware/spine-pixi-v8@~4.3.13
+        version: '@esotericsoftware/spine-pixi-v8@4.3.13(pixi.js@8.17.1)'
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -279,14 +284,25 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@esotericsoftware/spine-canvas@4.2.108':
-    resolution: {integrity: sha512-3OZwHa+i7H/UxxlqU75Xln93YpwSPOXX5emsKQLDW1Y+m/em2qYqVQjhqNfK5AbOr0bz36QSOEKSq7pCBnrDbA==}
+  '@esotericsoftware/spine-canvas@4.2.120':
+    resolution: {integrity: sha512-9a3QmIwNqBJSxEwoR0DYp7mkDqgbvuJlaR246ArpmslsBxVcku2t/3tFyO+fS0IN2pYOxeeBhqEjX4Tt0JDW3g==}
 
-  '@esotericsoftware/spine-core@4.2.108':
-    resolution: {integrity: sha512-pU/0KO1RqMRcg5ncwHVuCOjanGGNB1bzp8x6/hBoCH04mYLwF8QyxhFUQD+4/SrLipK6Wychj3PFaiyzK/mjnw==}
+  '@esotericsoftware/spine-canvas@4.3.13':
+    resolution: {integrity: sha512-L4iIkYUAYJxnzBfNqZTs5Be2HifgvaN2f/KM3aopIG0tbQYQQdAcgbjf5HsvwKgM65studN+/9gGIX3QoRLDIA==}
 
-  '@esotericsoftware/spine-pixi-v8@4.2.108':
-    resolution: {integrity: sha512-j2Hog/RyMyOEPiglVK6dzRph2PbaYNlGJdJ9OCp4EDt5x6iWg70AE6BInMfF2yVSMnQc0G+swPhAxMF5ihj38w==}
+  '@esotericsoftware/spine-core@4.2.120':
+    resolution: {integrity: sha512-X62MPnfiZTWok4Wk5Q5DqaAUBUFypKpb94IVd1W/j4eLHhg0HH3tve4HvIlkgxDpls2NokHaAtzjxX12rJknOA==}
+
+  '@esotericsoftware/spine-core@4.3.13':
+    resolution: {integrity: sha512-iGs/40qOWSQYicABebDzFSwFOS1Nsm0dCCS8sGqbpVuThRKdLYeI1cVJpmATSpEmtcetEABTmh97NoBnt7XLDw==}
+
+  '@esotericsoftware/spine-pixi-v8@4.2.120':
+    resolution: {integrity: sha512-5Upjk0mlqEMWGpJgJ2aEM7R4Uy8ODmYi2MYKyiqYNNLngH0korvVSZ8+Y7WiWqM5uMRQ6fo8Q0rtjoWfJt28Fg==}
+    peerDependencies:
+      pixi.js: ^8.16.0
+
+  '@esotericsoftware/spine-pixi-v8@4.3.13':
+    resolution: {integrity: sha512-cL+UCgHmaT6UA3J63JScHbT8ttJAUMGnfUVSGUYhI5/jElMb0gECbDmeJLFTAhLFj6a8YphDzSy+Pvhe8326og==}
     peerDependencies:
       pixi.js: ^8.16.0
 
@@ -3357,15 +3373,28 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@esotericsoftware/spine-canvas@4.2.108':
+  '@esotericsoftware/spine-canvas@4.2.120':
     dependencies:
-      '@esotericsoftware/spine-core': 4.2.108
+      '@esotericsoftware/spine-core': 4.2.120
 
-  '@esotericsoftware/spine-core@4.2.108': {}
-
-  '@esotericsoftware/spine-pixi-v8@4.2.108(pixi.js@8.17.1)':
+  '@esotericsoftware/spine-canvas@4.3.13':
     dependencies:
-      '@esotericsoftware/spine-canvas': 4.2.108
+      '@esotericsoftware/spine-core': 4.3.13
+
+  '@esotericsoftware/spine-core@4.2.120': {}
+
+  '@esotericsoftware/spine-core@4.3.13': {}
+
+  '@esotericsoftware/spine-pixi-v8@4.2.120(pixi.js@8.17.1)':
+    dependencies:
+      '@esotericsoftware/spine-canvas': 4.2.120
+      '@esotericsoftware/spine-core': 4.2.120
+      pixi.js: 8.17.1
+
+  '@esotericsoftware/spine-pixi-v8@4.3.13(pixi.js@8.17.1)':
+    dependencies:
+      '@esotericsoftware/spine-canvas': 4.3.13
+      '@esotericsoftware/spine-core': 4.3.13
       pixi.js: 8.17.1
 
   '@floating-ui/core@1.7.5':

@@ -3,10 +3,13 @@ import { Play, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { FileInputField } from './file-input-field';
 import { SectionCard } from './shared';
+import { SPINE_VERSIONS, type SpineVersion } from '../../lib/spine-runtime';
 import type { SelectedFiles } from './types';
 
 export function IntakePanel({
   files,
+  spineVersion,
+  onSpineVersionChange,
   status,
   error,
   canLoad,
@@ -18,6 +21,8 @@ export function IntakePanel({
   onLoad,
 }: {
   files: SelectedFiles
+  spineVersion: SpineVersion
+  onSpineVersionChange: (version: SpineVersion) => void
   status: string
   error: string
   canLoad: boolean
@@ -41,6 +46,30 @@ export function IntakePanel({
             <p className={error ? 'mt-2 text-sm font-medium text-foreground' : 'text-sm font-medium text-foreground'}>
               {status}
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+            <p className="text-sm font-semibold text-foreground">Spine runtime version</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              Pick the Spine editor version the assets were exported with. Binary and JSON exports are not
+              compatible across 4.2 and 4.3.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Spine runtime version">
+              {SPINE_VERSIONS.map((version) => (
+                <Button
+                  key={version}
+                  type="button"
+                  role="radio"
+                  aria-checked={spineVersion === version}
+                  variant={spineVersion === version ? 'default' : 'outline'}
+                  className="rounded-xl"
+                  disabled={loading}
+                  onClick={() => onSpineVersionChange(version)}
+                >
+                  Spine {version}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <FileInputField

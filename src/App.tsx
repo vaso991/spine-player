@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Assets, Cache, ColorMatrixFilter, Graphics, ImageSource, type Application } from 'pixi.js';
-import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8';
+import { ColorMatrixFilter, Graphics, ImageSource, type Application } from 'pixi.js';
+import type { Physics, SkeletonData, Spine, TextureAtlas } from 'spine-pixi-v8-4-2';
+import {
+  DEFAULT_SPINE_VERSION,
+  loadSpineRuntime,
+  type SpineRuntime,
+  type SpineVersion,
+} from './lib/spine-runtime';
 import { IntakePanel } from './components/spine-player/intake-panel';
 import { WorkspacePanel } from './components/spine-player/workspace-panel';
 import type {
@@ -132,19 +138,13 @@ const FILTER_DEFAULTS_BY_ID: Record<ColorFilterId, Partial<ColorFilterConfig>> =
   },
 };
 
+// Same value in both runtimes (`Physics.update` in spine-core), so no runtime is needed to reference it.
+const PHYSICS_UPDATE = 2 as Physics;
+
 function createAssetUrl(file: File) {
   return URL.createObjectURL(file);
 }
 
-function revokeAssetUrls(urls: string[]) {
-  for (const url of urls) {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function createAssetKey(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
 
 async function loadImageSource(file: File) {
   const objectUrl = createAssetUrl(file);
@@ -295,8 +295,35 @@ function classifyFiles(fileList: FileList | File[]) {
   return { atlas, skeleton, images };
 }
 
+function resetToSetupPose(spine: Spine) {
+  // 4.3 renamed `setToSetupPose` to `setupPose`.
+  const skeleton = spine.skeleton as typeof spine.skeleton & { setupPose?: () => void };
+
+  if (typeof skeleton.setupPose === 'function') {
+    skeleton.setupPose();
+  } else {
+    skeleton.setToSetupPose();
+  }
+}
+
+function countConstraints(data: SkeletonData) {
+  // 4.3 merges every constraint type into a single `constraints` list.
+  const unified = (data as unknown as { constraints?: unknown[] }).constraints;
+
+  if (Array.isArray(unified)) {
+    return unified.length;
+  }
+
+  return (
+    data.ikConstraints.length +
+    data.transformConstraints.length +
+    data.pathConstraints.length +
+    data.physicsConstraints.length
+  );
+}
+
 function getSpineBounds(spine: Spine) {
-  spine.skeleton.updateWorldTransform(Physics.update);
+  spine.skeleton.updateWorldTransform(PHYSICS_UPDATE);
 
   const bounds = spine.skeleton.getBoundsRect();
 
@@ -306,7 +333,7 @@ function getSpineBounds(spine: Spine) {
 }
 
 function computePlaybackInfo(spine: Spine): PlaybackInfo {
-  const entry = spine.state.getCurrent(0);
+  const entry = spine.state.tracks[0];
 
   if (!entry || !entry.animation) {
     return {
@@ -330,9 +357,9 @@ function computePlaybackInfo(spine: Spine): PlaybackInfo {
   };
 }
 
-function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
+function computeAnimationSummaries(runtime: SpineRuntime, spine: Spine): AnimationSummary[] {
   return spine.skeleton.data.animations.map((animation) => {
-    const maxBounds = new SkinsAndAnimationBoundsProvider(animation.name, [], 0.1, false).calculateBounds(spine);
+    const maxBounds = new runtime.SkinsAndAnimationBoundsProvider(animation.name, [], 0.1, false).calculateBounds(spine);
     const duration = animation.duration;
     const sampleCount = duration > 0 ? Math.max(2, Math.min(90, Math.ceil(duration * 30))) : 1;
     let minWidth = Number.POSITIVE_INFINITY;
@@ -342,10 +369,10 @@ function computeAnimationSummaries(spine: Spine): AnimationSummary[] {
       const sampleTime = duration > 0 ? (duration * sampleIndex) / sampleCount : 0;
 
       spine.state.clearTracks();
-      spine.skeleton.setToSetupPose();
+      resetToSetupPose(spine);
       spine.state.setAnimation(0, animation.name, false);
 
-      const entry = spine.state.getCurrent(0);
+      const entry = spine.state.tracks[0];
 
       if (!entry) {
         continue;
@@ -733,6 +760,7 @@ function updateSpineLayout(
 
 async function loadScene(
   files: SelectedFiles,
+  runtime: SpineRuntime,
   app: Application,
   requestedScale = DEFAULT_USER_SCALE,
   requestedFilters = DEFAULT_FILTER_CONFIG,
@@ -744,28 +772,14 @@ async function loadScene(
     throw new Error('Select an .atlas, a .skel or .json skeleton, and at least one .png or .webp image.');
   }
 
-  const tempUrls: string[] = [];
-  const assetKeys: string[] = [];
-  const cacheKeys: string[] = [];
+  let atlas: TextureAtlas | null = null;
 
   try {
     const atlasText = await files.atlas.text();
     const atlasInfo = parseAtlasInfo(atlasText);
     const atlasPageNames = getAtlasPageNames(atlasText);
     const isJsonSkeleton = files.skeleton.name.toLowerCase().endsWith('.json');
-    const skeletonUrl = isJsonSkeleton ? null : createAssetUrl(files.skeleton);
-    const atlasUrl = createAssetUrl(files.atlas);
-    const skeletonAssetKey = createAssetKey('spine-skeleton');
-    const atlasAssetKey = createAssetKey('spine-atlas');
     const pageTextures: Record<string, ImageSource> = {};
-
-    tempUrls.push(atlasUrl);
-    assetKeys.push(atlasAssetKey);
-
-    if (skeletonUrl) {
-      tempUrls.push(skeletonUrl);
-      assetKeys.push(skeletonAssetKey);
-    }
 
     for (const image of files.images) {
       pageTextures[image.name] = await loadImageSource(image);
@@ -789,9 +803,20 @@ async function loadScene(
       }
     }
 
+    // Built directly from the selected runtime (rather than through Pixi's Assets loaders) so
+    // the 4.2 and 4.3 runtimes never share asset loader registrations.
+    const loadedAtlas = new runtime.TextureAtlas(atlasText);
+
+    atlas = loadedAtlas;
+
+    for (const page of loadedAtlas.pages) {
+      page.setTexture(runtime.SpineTexture.from(pageTextures[page.name]));
+    }
+
+    const attachmentLoader = new runtime.AtlasAttachmentLoader(loadedAtlas);
+    let skeletonData: SkeletonData;
+
     if (isJsonSkeleton) {
-      // The Spine loader always returns raw bytes, which Spine.from would treat as binary,
-      // so JSON skeletons are parsed here and handed over through the Pixi cache instead.
       let skeletonJson: unknown;
 
       try {
@@ -800,40 +825,22 @@ async function loadScene(
         throw new Error(`"${files.skeleton.name}" is not valid JSON.`);
       }
 
-      Cache.set(skeletonAssetKey, skeletonJson);
-      cacheKeys.push(skeletonAssetKey);
+      skeletonData = new runtime.SkeletonJson(attachmentLoader).readSkeletonData(skeletonJson);
+    } else {
+      skeletonData = new runtime.SkeletonBinary(attachmentLoader).readSkeletonData(
+        new Uint8Array(await files.skeleton.arrayBuffer()),
+      );
     }
 
-    await Assets.load([
-      ...(skeletonUrl
-        ? [
-            {
-              alias: skeletonAssetKey,
-              parser: 'spineSkeletonLoader',
-              src: skeletonUrl,
-            },
-          ]
-        : []),
-      {
-        alias: atlasAssetKey,
-        parser: 'spineTextureAtlasLoader',
-        src: atlasUrl,
-        data: {
-          images: pageTextures,
-        },
-      },
-    ]);
-
-    const spine = Spine.from({
-      atlas: atlasAssetKey,
+    const spine = new runtime.Spine({
       autoUpdate: true,
-      skeleton: skeletonAssetKey,
+      skeletonData,
       ticker: app.ticker,
     });
     const debugAnchor = new Graphics();
     const debugBounds = new Graphics();
     const colorMatrixFilter = new ColorMatrixFilter();
-    const animationSummaries = computeAnimationSummaries(spine);
+    const animationSummaries = computeAnimationSummaries(runtime, spine);
     const getAnimationLayoutBounds = (animationName: string) => {
       const summary = animationSummaries.find((item) => item.name === animationName);
 
@@ -856,7 +863,7 @@ async function loadScene(
     let lastFpsUpdate = 0;
 
     const syncSceneMetrics = () => {
-      const activeAnimation = spine.state.getCurrent(0)?.animation?.name ?? '';
+      const activeAnimation = spine.state.tracks[0]?.animation?.name ?? '';
 
       onSizeChange?.(
         updateSpineLayout(
@@ -912,7 +919,7 @@ async function loadScene(
           debugBounds,
           debugAnchor,
           debugEnabledState.value,
-          getAnimationLayoutBounds(spine.state.getCurrent(0)?.animation?.name ?? ''),
+          getAnimationLayoutBounds(spine.state.tracks[0]?.animation?.name ?? ''),
         ),
       );
     };
@@ -923,8 +930,7 @@ async function loadScene(
       app,
       animationSummaries,
       atlasInfo,
-      assetKeys,
-      cacheKeys,
+      atlas: loadedAtlas,
       colorMatrixFilter,
       debugEnabled: debugEnabledState,
       debugAnchor,
@@ -938,17 +944,9 @@ async function loadScene(
       animations,
     };
   } catch (error) {
-    for (const assetKey of assetKeys) {
-      void Assets.unload(assetKey);
-    }
-
-    for (const cacheKey of cacheKeys) {
-      Cache.remove(cacheKey);
-    }
+    atlas?.dispose();
 
     throw error;
-  } finally {
-    revokeAssetUrls(tempUrls);
   }
 }
 
@@ -969,13 +967,7 @@ function destroyScene(scene: LoadedScene | null) {
   scene.colorMatrixFilter.destroy();
   scene.spine.destroy();
 
-  for (const assetKey of scene.assetKeys) {
-    void Assets.unload(assetKey);
-  }
-
-  for (const cacheKey of scene.cacheKeys) {
-    Cache.remove(cacheKey);
-  }
+  scene.atlas.dispose();
 }
 
 function App() {
@@ -1000,6 +992,7 @@ function App() {
   const [fps, setFps] = useState<number | null>(null);
   const [hasScene, setHasScene] = useState(false);
   const [showWorkspace, setShowWorkspace] = useState(false);
+  const [spineVersion, setSpineVersion] = useState<SpineVersion>(DEFAULT_SPINE_VERSION);
   const [spineSize, setSpineSize] = useState<SpineSize | null>(null);
   const [animationSummaries, setAnimationSummaries] = useState<AnimationSummary[]>([]);
   const [atlasInfo, setAtlasInfo] = useState<AtlasInfo | null>(null);
@@ -1145,7 +1138,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getCurrent(0);
+    const entry = scene.spine.state.tracks[0];
 
     if (!entry || !entry.animation) {
       return;
@@ -1170,7 +1163,7 @@ function App() {
     scene.spine.state.timeScale = 0;
     entry.trackTime = nextTrackTime;
     scene.spine.state.apply(scene.spine.skeleton);
-    scene.spine.skeleton.updateWorldTransform(Physics.update);
+    scene.spine.skeleton.updateWorldTransform(PHYSICS_UPDATE);
     scene.syncSceneMetrics();
     setPlaybackInfo(computePlaybackInfo(scene.spine));
   }
@@ -1182,7 +1175,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getCurrent(0);
+    const entry = scene.spine.state.tracks[0];
 
     if (!entry || !entry.animation) {
       return;
@@ -1198,7 +1191,7 @@ function App() {
     scene.spine.state.timeScale = 0;
     entry.trackTime = duration > 0 ? Math.min(duration, Math.max(0, nextTrackTime)) : 0;
     scene.spine.state.apply(scene.spine.skeleton);
-    scene.spine.skeleton.updateWorldTransform(Physics.update);
+    scene.spine.skeleton.updateWorldTransform(PHYSICS_UPDATE);
     scene.syncSceneMetrics();
     setPlaybackInfo(computePlaybackInfo(scene.spine));
   }
@@ -1210,7 +1203,7 @@ function App() {
       return;
     }
 
-    const entry = scene.spine.state.getCurrent(0);
+    const entry = scene.spine.state.tracks[0];
 
     if (!entry || !entry.animation) {
       return;
@@ -1223,7 +1216,7 @@ function App() {
     scene.spine.state.timeScale = 0;
     entry.trackTime = duration > 0 ? Math.min(duration, Math.max(0, nextTrackTime)) : 0;
     scene.spine.state.apply(scene.spine.skeleton);
-    scene.spine.skeleton.updateWorldTransform(Physics.update);
+    scene.spine.skeleton.updateWorldTransform(PHYSICS_UPDATE);
     scene.syncSceneMetrics();
     setPlaybackInfo(computePlaybackInfo(scene.spine));
   }
@@ -1352,6 +1345,18 @@ function App() {
   }
 
   async function handleLoad() {
+    let runtime: SpineRuntime;
+
+    try {
+      // Must happen before the Pixi Application is created so it picks up this runtime's render pipe.
+      runtime = await loadSpineRuntime(spineVersion);
+    } catch (caughtError) {
+      setError(`Unable to load the Spine ${spineVersion} runtime.`);
+      setStatus('Load failed.');
+      console.error(caughtError);
+      return;
+    }
+
     if (!showWorkspace) {
       pixiAppRef.current = null;
       setShowWorkspace(true);
@@ -1394,6 +1399,7 @@ function App() {
     try {
       const scene = await loadScene(
         files,
+        runtime,
         app,
         files.atlas ? parseAtlasInfo(await files.atlas.text())?.scale ?? DEFAULT_USER_SCALE : DEFAULT_USER_SCALE,
         nextFilterConfig,
@@ -1424,11 +1430,7 @@ function App() {
           0,
         ),
         boneCount: scene.spine.skeleton.data.bones.length,
-        constraintCount:
-          scene.spine.skeleton.data.ikConstraints.length +
-          scene.spine.skeleton.data.transformConstraints.length +
-          scene.spine.skeleton.data.pathConstraints.length +
-          scene.spine.skeleton.data.physicsConstraints.length,
+        constraintCount: countConstraints(scene.spine.skeleton.data),
         dopesheetFps: scene.spine.skeleton.data.fps > 0 ? scene.spine.skeleton.data.fps : null,
         eventCount: scene.spine.skeleton.data.events.length,
         skinCount: scene.spine.skeleton.data.skins.length,
@@ -1528,6 +1530,8 @@ function App() {
         {!showWorkspace ? (
           <IntakePanel
             files={files}
+            spineVersion={spineVersion}
+            onSpineVersionChange={setSpineVersion}
             status={status}
             error={error}
             canLoad={canLoad}

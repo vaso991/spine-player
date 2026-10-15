@@ -1,5 +1,5 @@
 import type { Application, ColorMatrixFilter, Graphics } from 'pixi.js';
-import type { Spine } from '@esotericsoftware/spine-pixi-v8';
+import type { Spine, TextureAtlas } from 'spine-pixi-v8-4-2';
 
 export type SelectedFiles = {
   atlas: File | null
@@ -43,8 +43,7 @@ export type LoadedScene = {
   syncSceneMetrics: () => void
   spine: Spine
   animations: string[]
-  assetKeys: string[]
-  cacheKeys: string[]
+  atlas: TextureAtlas
 }
 
 export type ColorFilterId =

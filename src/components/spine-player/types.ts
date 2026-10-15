@@ -44,6 +44,7 @@ export type LoadedScene = {
   spine: Spine
   animations: string[]
   assetKeys: string[]
+  cacheKeys: string[]
 }
 
 export type ColorFilterId =

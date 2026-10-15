@@ -33,7 +33,7 @@ export function IntakePanel({
       <SectionCard
         icon={Upload}
         title="Asset Intake"
-        description="Load your atlas, skeleton binary, and page textures."
+        description="Load your atlas, skeleton (.skel or .json), and page textures."
       >
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
@@ -46,7 +46,7 @@ export function IntakePanel({
           <FileInputField
             id="all-spine-files"
             label="All Spine files"
-            accept=".atlas,.skel,.png,.webp,text/plain,application/octet-stream,image/png,image/webp"
+            accept=".atlas,.skel,.json,.png,.webp,text/plain,application/octet-stream,application/json,image/png,image/webp"
             multiple
             filesLabel={[
               files.atlas?.name,
@@ -55,7 +55,7 @@ export function IntakePanel({
             ]
               .filter(Boolean)
               .join(', ') || 'No files selected'}
-            hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`, and `.png`/`.webp`."
+            hint="Select the full export in one pass. The player auto-detects `.atlas`, `.skel`/`.json`, and `.png`/`.webp`."
             onFilesSelected={onApplyCombinedFiles}
           />
 
@@ -84,10 +84,10 @@ export function IntakePanel({
 
               <FileInputField
                 id="skeleton-file"
-                label="Skeleton binary"
-                accept=".skel,application/octet-stream"
+                label="Skeleton (.skel or .json)"
+                accept=".skel,.json,application/octet-stream,application/json"
                 mode="compact"
-                filesLabel={files.skeleton?.name ?? 'No .skel selected'}
+                filesLabel={files.skeleton?.name ?? 'No skeleton selected'}
                 onFilesSelected={onSkeletonSelected}
               />
 

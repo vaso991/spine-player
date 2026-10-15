@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Assets, ColorMatrixFilter, Graphics, ImageSource, type Application } from 'pixi.js';
+import { Assets, Cache, ColorMatrixFilter, Graphics, ImageSource, type Application } from 'pixi.js';
 import { Physics, Spine, SkinsAndAnimationBoundsProvider } from '@esotericsoftware/spine-pixi-v8';
 import { IntakePanel } from './components/spine-player/intake-panel';
 import { WorkspacePanel } from './components/spine-player/workspace-panel';
@@ -282,7 +282,7 @@ function classifyFiles(fileList: FileList | File[]) {
       continue;
     }
 
-    if (lowerName.endsWith('.skel')) {
+    if (lowerName.endsWith('.skel') || lowerName.endsWith('.json')) {
       skeleton = file;
       continue;
     }
@@ -741,24 +741,31 @@ async function loadScene(
   onPlaybackChange?: (playback: PlaybackInfo) => void,
 ): Promise<LoadedScene> {
   if (!files.atlas || !files.skeleton || files.images.length === 0) {
-    throw new Error('Select an .atlas, a .skel skeleton, and at least one .png or .webp image.');
+    throw new Error('Select an .atlas, a .skel or .json skeleton, and at least one .png or .webp image.');
   }
 
   const tempUrls: string[] = [];
   const assetKeys: string[] = [];
+  const cacheKeys: string[] = [];
 
   try {
     const atlasText = await files.atlas.text();
     const atlasInfo = parseAtlasInfo(atlasText);
     const atlasPageNames = getAtlasPageNames(atlasText);
-    const skeletonUrl = createAssetUrl(files.skeleton);
+    const isJsonSkeleton = files.skeleton.name.toLowerCase().endsWith('.json');
+    const skeletonUrl = isJsonSkeleton ? null : createAssetUrl(files.skeleton);
     const atlasUrl = createAssetUrl(files.atlas);
     const skeletonAssetKey = createAssetKey('spine-skeleton');
     const atlasAssetKey = createAssetKey('spine-atlas');
     const pageTextures: Record<string, ImageSource> = {};
 
-    tempUrls.push(skeletonUrl, atlasUrl);
-    assetKeys.push(skeletonAssetKey, atlasAssetKey);
+    tempUrls.push(atlasUrl);
+    assetKeys.push(atlasAssetKey);
+
+    if (skeletonUrl) {
+      tempUrls.push(skeletonUrl);
+      assetKeys.push(skeletonAssetKey);
+    }
 
     for (const image of files.images) {
       pageTextures[image.name] = await loadImageSource(image);
@@ -782,12 +789,31 @@ async function loadScene(
       }
     }
 
+    if (isJsonSkeleton) {
+      // The Spine loader always returns raw bytes, which Spine.from would treat as binary,
+      // so JSON skeletons are parsed here and handed over through the Pixi cache instead.
+      let skeletonJson: unknown;
+
+      try {
+        skeletonJson = JSON.parse(await files.skeleton.text());
+      } catch {
+        throw new Error(`"${files.skeleton.name}" is not valid JSON.`);
+      }
+
+      Cache.set(skeletonAssetKey, skeletonJson);
+      cacheKeys.push(skeletonAssetKey);
+    }
+
     await Assets.load([
-      {
-        alias: skeletonAssetKey,
-        parser: 'spineSkeletonLoader',
-        src: skeletonUrl,
-      },
+      ...(skeletonUrl
+        ? [
+            {
+              alias: skeletonAssetKey,
+              parser: 'spineSkeletonLoader',
+              src: skeletonUrl,
+            },
+          ]
+        : []),
       {
         alias: atlasAssetKey,
         parser: 'spineTextureAtlasLoader',
@@ -898,6 +924,7 @@ async function loadScene(
       animationSummaries,
       atlasInfo,
       assetKeys,
+      cacheKeys,
       colorMatrixFilter,
       debugEnabled: debugEnabledState,
       debugAnchor,
@@ -913,6 +940,10 @@ async function loadScene(
   } catch (error) {
     for (const assetKey of assetKeys) {
       void Assets.unload(assetKey);
+    }
+
+    for (const cacheKey of cacheKeys) {
+      Cache.remove(cacheKey);
     }
 
     throw error;
@@ -940,6 +971,10 @@ function destroyScene(scene: LoadedScene | null) {
 
   for (const assetKey of scene.assetKeys) {
     void Assets.unload(assetKey);
+  }
+
+  for (const cacheKey of scene.cacheKeys) {
+    Cache.remove(cacheKey);
   }
 }
 
